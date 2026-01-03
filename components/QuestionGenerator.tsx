@@ -45,10 +45,14 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
     setManualQ(prev => ({ ...prev, folderId: selectedFolderId }));
   }, [selectedFolderId]);
 
+  /**
+   * Helper to manually render math and markdown to bypass quirks mode check
+   */
   const formatText = (text: string) => {
     if (!text) return null;
     let html = text;
 
+    // KaTeX render
     html = html.replace(/\$\$(.*?)\$\$/gs, (_, math) => {
       try { return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false }); } catch (e) { return math; }
     });
@@ -56,6 +60,7 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
       try { return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false }); } catch (e) { return math; }
     });
 
+    // Simple Markdown
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\n/g, '<br />');
 
@@ -66,29 +71,9 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
 
   const normalizeType = (rawType: any): QuestionType => {
     const typeStr = String(rawType || "").toUpperCase();
-    
-    // Kiểm tra Trắc nghiệm
-    if (
-      typeStr.includes("MULTIPLE") || 
-      typeStr.includes("CHOICE") || 
-      typeStr.includes("TRẮC NGHIỆM") || 
-      typeStr.includes("TRAC NGHIEM")
-    ) {
+    if (typeStr.includes("MULTIPLE") || typeStr.includes("TRẮC NGHIỆM") || typeStr.includes("TRAC NGHIEM")) {
       return QuestionType.MULTIPLE_CHOICE;
     }
-    
-    // Kiểm tra Tự luận
-    if (
-      typeStr.includes("ESSAY") || 
-      typeStr.includes("TỰ LUẬN") || 
-      typeStr.includes("TU LUAN") || 
-      typeStr.includes("ORAL")
-    ) {
-      return QuestionType.ESSAY;
-    }
-
-    // Mặc định dựa trên cấu trúc (nếu có options thì là MULTIPLE)
-    console.warn("[DHSYSTEM] Unknown type from AI, guessing based on structure:", rawType);
     return QuestionType.ESSAY;
   };
 
@@ -120,7 +105,7 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
         id: Math.random().toString(36).substr(2, 9), 
         folderId: selectedFolderId, 
         createdAt: Date.now(),
-        type: q.options && q.options.length > 0 ? QuestionType.MULTIPLE_CHOICE : normalizeType(q.type)
+        type: normalizeType(q.type)
       } as Question));
       setGeneratedQuestions(processed);
       setIsPreview(true);
@@ -198,7 +183,7 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
         id: Math.random().toString(36).substr(2, 9), 
         folderId: selectedFolderId, 
         createdAt: Date.now(),
-        type: q.options && q.options.length > 0 ? QuestionType.MULTIPLE_CHOICE : normalizeType(q.type)
+        type: normalizeType(q.type)
       }));
       
       setGeneratedQuestions(processed);
@@ -437,6 +422,7 @@ Dây tiếp địa giúp dẫn dòng điện rò rỉ xuống đất, bảo vệ
                       {manualQ.options.map((opt, i) => (
                         <div key={i} className="flex gap-2">
                           <input type="text" value={opt} onChange={e => { const n = [...manualQ.options]; n[i] = e.target.value; setManualQ({...manualQ, options: n}); }} placeholder={`Phương án ${String.fromCharCode(65+i)}`} className="flex-1 p-3 rounded-xl border border-gray-200 outline-none focus:border-blue-500 transition-all" />
+                          {/* Fix: removed undefined manualKey from condition */}
                           <button onClick={() => setManualQ({...manualQ, correctAnswer: opt})} className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${manualQ.correctAnswer === opt && opt !== '' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-white text-gray-300 border-2 border-gray-100'}`}><i className="fas fa-check text-xs"></i></button>
                         </div>
                       ))}

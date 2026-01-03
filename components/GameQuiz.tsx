@@ -697,7 +697,7 @@ const MillionaireGame = ({ userInfo, questions, onExit, onSaveScore }: { userInf
                                 }
                             }}
                         >
-                            <i className={`fas ${id === 'fifty' ? 'fa-percentage' : id === 'call' ? 'fa-robot' : id === 'audience' ? 'fa-users' : ''}`}></i>
+                            <i className={`fas ${id === 'fifty' ? 'fa-percentage' : id === 'call' ? 'fa-robot' : 'fa-users'}`}></i>
                         </button>
                      ))}
                  </div>
@@ -801,7 +801,21 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
     return [...base].sort(() => 0.5 - Math.random()).slice(0, questionLimit);
   }, [questions, selectedFolderIds, questionLimit, targetGame]);
 
-  // Fix: Removed redundant and type-incorrect maxAvailable useMemo block.
+  const maxAvailable = useMemo(() => {
+      let base = questions;
+      if (!selectedFolderIds.includes('all')) {
+          base = questions.filter(q => selectedFolderIds.includes(q.folderId));
+      }
+      if (targetGame === 'MILLIONAIRE' || targetGame === 'FLASHCARD') {
+          base = base.filter(q => q.type === QuestionType.MULTIPLE_CHOICE).length;
+      } else if (targetGame === 'ORAL') {
+          base = base.filter(q => q.type === QuestionType.ESSAY).length;
+      } else {
+          return base.length;
+      }
+      return 0; // Default case
+  }, [questions, selectedFolderIds, targetGame]);
+
   // Re-calculate maxAvailable properly
   const calculatedMax = useMemo(() => {
     let base = questions;
@@ -832,6 +846,7 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
       setTargetGame(game);
       setMode('SETUP');
       // Set reasonable defaults for each game type
+      const currentMax = questions.length; // Placeholder, use calculatedMax in render
       if (game === 'MILLIONAIRE') setQuestionLimit(Math.min(15, 15));
       else if (game === 'FLASHCARD') setQuestionLimit(Math.min(20, 20));
       else if (game === 'TIMED') setQuestionLimit(Math.min(10, 10));

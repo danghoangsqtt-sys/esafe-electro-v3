@@ -2,9 +2,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DocumentFile, VectorChunk } from '../types';
 import { extractDataFromPDF, chunkText, embedChunks } from '../services/documentProcessor';
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/build/pdf";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 
-GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
+// Kiểm tra xem có đang chạy trong Electron không
+const isElectron = navigator.userAgent.toLowerCase().includes(' electron/');
+const ipcRenderer = isElectron ? (window as any).require('electron').ipcRenderer : null;
 
 interface DocumentsProps {
   onUpdateKnowledgeBase: (chunks: VectorChunk[]) => void;
@@ -12,21 +17,7 @@ interface DocumentsProps {
   onNotify: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
-const INITIAL_DOCS: DocumentFile[] = [
-  { 
-      id: '1', 
-      name: 'Giao trinh An toan dien Co ban.pdf', 
-      type: 'PDF', 
-      url: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf', 
-      uploadDate: '2024-05-20',
-      isProcessed: true,
-      metadata: {
-          title: 'Giáo trình An toàn điện',
-          author: 'Bộ môn Điện',
-          creationDate: '20/05/2024'
-      }
-  },
-];
+const INITIAL_DOCS: DocumentFile[] = [];
 
 const PdfViewer: React.FC<{ url: string; isFullScreen: boolean; onToggleFullScreen: () => void }> = ({ url, isFullScreen, onToggleFullScreen }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,19 +29,22 @@ const PdfViewer: React.FC<{ url: string; isFullScreen: boolean; onToggleFullScre
     const [rotation, setRotation] = useState(0);
     const [loading, setLoading] = useState(true);
     const [inputPage, setInputPage] = useState("1");
+    const [error, setError] = useState<string | null>(null);
 
     const loadPdf = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
-            const loadingTask = getDocument(url);
+            const loadingTask = pdfjsLib.getDocument(url);
             const loadedPdf = await loadingTask.promise;
             setPdf(loadedPdf);
             setTotal(loadedPdf.numPages);
             setPageNum(1);
             setInputPage("1");
             setLoading(false);
-        } catch (err) {
+        } catch (err: any) {
             console.error("PDF Load Error:", err);
+            setError("Không thể tải tệp PDF. Có thể tệp đã bị xóa hoặc đường dẫn không hợp lệ.");
             setLoading(false);
         }
     }, [url]);
@@ -85,18 +79,6 @@ const PdfViewer: React.FC<{ url: string; isFullScreen: boolean; onToggleFullScre
         renderPage();
     }, [renderPage]);
 
-    // Keyboard navigation
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'ArrowRight') setPageNum(p => Math.min(total, p + 1));
-            if (e.key === 'ArrowLeft') setPageNum(p => Math.max(1, p - 1));
-            if (e.key === '=' || e.key === '+') setScale(s => Math.min(3, s + 0.1));
-            if (e.key === '-') setScale(s => Math.max(0.5, s - 0.1));
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [total]);
-
     const handleJumpPage = (e: React.FormEvent) => {
         e.preventDefault();
         const p = parseInt(inputPage);
@@ -113,31 +95,17 @@ const PdfViewer: React.FC<{ url: string; isFullScreen: boolean; onToggleFullScre
 
     return (
         <div ref={containerRef} className={`flex flex-col h-full bg-[#1e1e24] transition-all relative ${isFullScreen ? 'fixed inset-0 z-[100]' : 'rounded-xl overflow-hidden border border-gray-800 shadow-xl'}`}>
-             {/* Streamlined Toolbar */}
              <div className="bg-gray-900/90 backdrop-blur-md border-b border-white/5 p-2 flex flex-wrap justify-between items-center z-20 sticky top-0 px-4">
                  <div className="flex items-center gap-3">
                      <div className="flex items-center bg-white/5 rounded-lg p-0.5 border border-white/10">
-                         <button 
-                            onClick={() => setPageNum(p => Math.max(1, p-1))} 
-                            disabled={pageNum <= 1} 
-                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 disabled:opacity-20 transition-all text-white"
-                         >
+                         <button onClick={() => setPageNum(p => Math.max(1, p-1))} disabled={pageNum <= 1} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 disabled:opacity-20 transition-all text-white">
                              <i className="fas fa-chevron-left text-[10px]"></i>
                          </button>
                          <form onSubmit={handleJumpPage} className="flex items-center px-1">
-                             <input 
-                                type="text" 
-                                value={inputPage} 
-                                onChange={(e) => setInputPage(e.target.value)}
-                                className="w-8 bg-transparent text-center text-[11px] font-bold text-blue-400 outline-none"
-                             />
+                             <input type="text" value={inputPage} onChange={(e) => setInputPage(e.target.value)} className="w-8 bg-transparent text-center text-[11px] font-bold text-blue-400 outline-none" />
                              <span className="text-[9px] font-medium text-gray-500 mx-0.5">/ {total}</span>
                          </form>
-                         <button 
-                            onClick={() => setPageNum(p => Math.min(total, p+1))} 
-                            disabled={pageNum >= total} 
-                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 disabled:opacity-20 transition-all text-white"
-                         >
+                         <button onClick={() => setPageNum(p => Math.min(total, p+1))} disabled={pageNum >= total} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 disabled:opacity-20 transition-all text-white">
                              <i className="fas fa-chevron-right text-[10px]"></i>
                          </button>
                      </div>
@@ -150,46 +118,26 @@ const PdfViewer: React.FC<{ url: string; isFullScreen: boolean; onToggleFullScre
                  </div>
 
                  <div className="flex items-center gap-2">
-                     <button 
-                        onClick={() => setRotation(r => (r + 90) % 360)} 
-                        title="Xoay"
-                        className="w-8 h-8 flex items-center justify-center bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-all"
-                     >
-                        <i className="fas fa-rotate-right text-[10px]"></i>
-                     </button>
-                     <button 
-                        onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = 'Document.pdf';
-                            link.click();
-                        }}
-                        className="w-8 h-8 flex items-center justify-center bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-all"
-                     >
-                        <i className="fas fa-download text-[10px]"></i>
-                     </button>
-                     <button 
-                        onClick={onToggleFullScreen} 
-                        className="w-8 h-8 flex items-center justify-center bg-blue-600 border border-blue-500 rounded-lg text-white hover:bg-blue-500 transition-all"
-                     >
+                     <button onClick={onToggleFullScreen} className="w-8 h-8 flex items-center justify-center bg-blue-600 border border-blue-500 rounded-lg text-white hover:bg-blue-500 transition-all">
                         <i className={`fas ${isFullScreen ? 'fa-compress' : 'fa-expand'} text-[10px]`}></i>
                      </button>
                  </div>
              </div>
 
-             {/* Main Viewer Area */}
-             <div className="flex-1 overflow-auto bg-[#1e1e24] flex justify-center p-4 md:p-6 custom-scrollbar">
+             <div className="flex-1 overflow-auto bg-[#1e1e24] flex flex-col items-center justify-center p-4 md:p-6 custom-scrollbar">
                  {loading ? (
-                    <div className="text-white flex flex-col items-center justify-center gap-3 mt-10">
+                    <div className="text-white flex flex-col items-center justify-center gap-3">
                         <i className="fas fa-circle-notch fa-spin text-3xl text-blue-500"></i>
                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Đang nạp PDF...</span>
+                    </div>
+                 ) : error ? (
+                    <div className="text-center p-10">
+                        <i className="fas fa-file-circle-exclamation text-red-500 text-5xl mb-4"></i>
+                        <p className="text-white font-bold">{error}</p>
                     </div>
                  ) : (
                     <div className="relative shadow-2xl">
                         <canvas ref={canvasRef} className="bg-white rounded-sm" />
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm text-[9px] font-bold text-white px-3 py-1 rounded-full border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                           {pageNum} / {total}
-                        </div>
                     </div>
                  )}
              </div>
@@ -212,31 +160,53 @@ const Documents: React.FC<DocumentsProps> = ({ onUpdateKnowledgeBase, onDeleteDo
       localStorage.setItem('elearning_docs', JSON.stringify(docs));
   }, [docs]);
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = error => reject(error);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || file.type !== 'application/pdf') return onNotify("Vui lòng tải tệp PDF.", "error");
 
     const newDocId = Date.now().toString();
-    const blobUrl = URL.createObjectURL(file);
-    const newDoc: DocumentFile = {
-        id: newDocId,
-        name: file.name,
-        type: 'PDF',
-        url: blobUrl,
-        uploadDate: new Date().toLocaleDateString('vi-VN'),
-        isProcessed: false,
-        metadata: { title: 'Đang trích xuất...' }
-    };
-    
-    setDocs(prev => [newDoc, ...prev]);
-    setSelectedDoc(newDoc);
     setIsProcessing(true);
     setProcessingDocId(newDocId);
     setProgress(5);
 
     try {
+        // Lưu file vào ổ cứng qua IPC nếu đang chạy Electron
+        let persistentUrl = "";
+        if (ipcRenderer) {
+            const base64 = await fileToBase64(file);
+            const result = await ipcRenderer.invoke('save-pdf', { fileName: file.name, base64Data: base64 });
+            if (result.success) {
+                persistentUrl = result.filePath;
+            } else {
+                throw new Error(result.error);
+            }
+        } else {
+            persistentUrl = URL.createObjectURL(file);
+        }
+
         const { text, metadata } = await extractDataFromPDF(file);
-        setDocs(prev => prev.map(d => d.id === newDocId ? { ...d, metadata } : d));
+        
+        const newDoc: DocumentFile = {
+            id: newDocId,
+            name: file.name,
+            type: 'PDF',
+            url: persistentUrl,
+            uploadDate: new Date().toLocaleDateString('vi-VN'),
+            isProcessed: false,
+            metadata: metadata
+        };
+        
+        setDocs(prev => [newDoc, ...prev]);
+        setSelectedDoc(newDoc);
         
         setProgress(20);
         const chunks = chunkText(text);
@@ -247,10 +217,9 @@ const Documents: React.FC<DocumentsProps> = ({ onUpdateKnowledgeBase, onDeleteDo
 
         onUpdateKnowledgeBase(vectorChunks);
         setDocs(prev => prev.map(d => d.id === newDocId ? { ...d, isProcessed: true } : d));
-        onNotify("Đã nạp tri thức thành công!", "success");
-    } catch (error) {
-        onNotify("Lỗi xử lý tài liệu.", "error");
-        setDocs(prev => prev.filter(d => d.id !== newDocId));
+        onNotify("Đã lưu và nạp tri thức thành công!", "success");
+    } catch (error: any) {
+        onNotify(`Lỗi xử lý tài liệu: ${error.message}`, "error");
     } finally {
         setIsProcessing(false);
         setProcessingDocId(null);
@@ -270,7 +239,7 @@ const Documents: React.FC<DocumentsProps> = ({ onUpdateKnowledgeBase, onDeleteDo
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
          <div>
             <h2 className="text-xl font-bold text-gray-800 tracking-tight">Thư viện Tri thức</h2>
-            <p className="text-xs text-gray-500 font-medium">Quản lý và huấn luyện AI từ giáo trình của bạn</p>
+            <p className="text-xs text-gray-500 font-medium">Tài liệu được lưu trữ vĩnh viễn trên ổ cứng của bạn</p>
          </div>
          <label className={`cursor-pointer bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-100 transition-all hover:bg-blue-700 active:scale-95 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
             <i className="fas fa-file-upload"></i>
@@ -280,19 +249,14 @@ const Documents: React.FC<DocumentsProps> = ({ onUpdateKnowledgeBase, onDeleteDo
       </div>
 
       <div className="flex-1 flex gap-6 min-h-0">
-        {/* Compact Sidebar */}
         <div className="w-72 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden shrink-0">
             <div className="p-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Danh sách ({docs.length})</span>
-                <i className="fas fa-folder text-blue-300 text-xs"></i>
+                <i className="fas fa-hdd text-blue-300 text-xs"></i>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
                 {docs.map(doc => (
-                    <div 
-                        key={doc.id} 
-                        onClick={() => setSelectedDoc(doc)}
-                        className={`p-3 rounded-xl border-2 cursor-pointer transition-all relative group ${selectedDoc?.id === doc.id ? 'bg-blue-50 border-blue-100' : 'bg-white border-transparent hover:bg-gray-50'}`}
-                    >
+                    <div key={doc.id} onClick={() => setSelectedDoc(doc)} className={`p-3 rounded-xl border-2 cursor-pointer transition-all relative group ${selectedDoc?.id === doc.id ? 'bg-blue-50 border-blue-100' : 'bg-white border-transparent hover:bg-gray-50'}`}>
                         <button onClick={(e) => {e.stopPropagation(); deleteDoc(doc)}} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-1"><i className="fas fa-trash-alt text-[10px]"></i></button>
                         <div className="flex gap-3">
                             <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${doc.isProcessed ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'}`}>
@@ -307,15 +271,11 @@ const Documents: React.FC<DocumentsProps> = ({ onUpdateKnowledgeBase, onDeleteDo
                                 </div>
                             </div>
                         </div>
-                        {doc.id === processingDocId && (
-                            <div className="absolute bottom-0 left-0 h-0.5 bg-blue-500 transition-all rounded-b-xl" style={{ width: `${progress}%` }}></div>
-                        )}
                     </div>
                 ))}
             </div>
         </div>
 
-        {/* Professional Viewer Container */}
         <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col relative">
             {selectedDoc ? (
                 <PdfViewer url={selectedDoc.url} isFullScreen={isFullScreen} onToggleFullScreen={() => setIsFullScreen(!isFullScreen)} />

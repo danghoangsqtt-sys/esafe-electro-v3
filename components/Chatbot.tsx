@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { generateChatResponse } from '../services/geminiService';
 import { ChatMessage, VectorChunk } from '../types';
@@ -30,38 +31,30 @@ const Chatbot: React.FC<ChatbotProps> = ({ temperature, maxTokens, aiVoice = 'Ko
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  /**
-   * Bộ xử lý văn bản thủ công:
-   * 1. Render KaTeX sang chuỗi HTML (vượt qua Quirks Mode check của auto-render)
-   * 2. Xử lý Markdown (In đậm, danh sách)
-   */
   const formatContent = (text: string) => {
     if (!text) return null;
-    let html = text;
+    
+    // 1. Replace newlines with <br /> first to avoid breaking KaTeX SVG later
+    let html = text.replace(/\n/g, '<br />');
 
-    // --- 1. Xử lý KaTeX (Manual Render) ---
-    // Render khối $$ ... $$
+    // 2. Render Display Math
     html = html.replace(/\$\$(.*?)\$\$/gs, (_, math) => {
       try {
-        return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
-      } catch (e) { return math; }
-    });
-    // Render dòng $ ... $
-    html = html.replace(/\$(.*?)\$/g, (_, math) => {
-      try {
-        return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false });
+        const cleanMath = math.replace(/<br \/>/g, '\n');
+        return (window as any).katex.renderToString(cleanMath, { displayMode: true, throwOnError: false });
       } catch (e) { return math; }
     });
 
-    // --- 2. Xử lý Markdown ---
-    // In đậm: **text** -> strong
+    // 3. Render Inline Math
+    html = html.replace(/\$(.*?)\$/g, (_, math) => {
+      try {
+        const cleanMath = math.replace(/<br \/>/g, '\n');
+        return (window as any).katex.renderToString(cleanMath, { displayMode: false, throwOnError: false });
+      } catch (e) { return math; }
+    });
+
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-black text-blue-900">$1</strong>');
-    
-    // Danh sách: - item -> li
     html = html.replace(/^\s*-\s+(.*)$/gm, '<li class="ml-4 list-disc mb-1">$1</li>');
-    
-    // Xuống dòng
-    html = html.replace(/\n/g, '<br />');
 
     return <div dangerouslySetInnerHTML={{ __html: html }} />;
   };
@@ -109,11 +102,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ temperature, maxTokens, aiVoice = 'Ko
         };
         
         setMessages((prev) => [...prev, modelMsg]);
-    } catch (error) {
+    } catch (error: any) {
+        let errorText = 'DHsystem AI phát hiện lỗi kết nối. Hãy kiểm tra API Key trong phần Cài đặt.';
+        
+        if (error.toString().includes('429') || error.toString().includes('RESOURCE_EXHAUSTED')) {
+          errorText = '⚠️ **Hết lượt sử dụng (Quota Exceeded)**: Bạn đã vượt quá giới hạn lượt hỏi miễn phí trong phút/ngày của Google Gemini API. Vui lòng thử lại sau ít phút hoặc sử dụng API Key khác.';
+        }
+
         setMessages((prev) => [...prev, {
             id: Date.now().toString(),
             role: 'model',
-            text: 'DHsystem AI phát hiện lỗi kết nối. Hãy kiểm tra API Key trong phần Cài đặt.',
+            text: errorText,
             timestamp: Date.now()
         }]);
     } finally {

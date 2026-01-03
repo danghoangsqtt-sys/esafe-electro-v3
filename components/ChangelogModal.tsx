@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import versionData from '../version.json';
 
 interface VersionData {
   version: string;
@@ -8,40 +9,23 @@ interface VersionData {
 }
 
 const ChangelogModal: React.FC = () => {
-  const [data, setData] = useState<VersionData | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const data: VersionData = versionData;
 
   useEffect(() => {
-    const checkVersion = async () => {
-      try {
-        // Lấy file version.json từ thư mục gốc cục bộ
-        const response = await fetch('./version.json?t=' + Date.now());
-        if (!response.ok) return;
-        
-        const json: VersionData = await response.json();
-        
-        // Kiểm tra xem người dùng đã xem phiên bản này chưa hoặc vừa mới nâng cấp xong
-        const lastSeenVersion = localStorage.getItem('last_seen_version');
-        const justUpdated = localStorage.getItem('just_updated');
-        
-        if (lastSeenVersion !== json.version || justUpdated === 'true') {
-          setData(json);
-          setIsOpen(true);
-        }
-      } catch (error) {
-        console.error("Không thể tải thông tin phiên bản:", error);
-      }
-    };
-
-    checkVersion();
-  }, []);
+    // Kiểm tra xem người dùng đã xem phiên bản này chưa hoặc vừa mới nâng cấp xong
+    const lastSeenVersion = localStorage.getItem('last_seen_version');
+    const justUpdated = localStorage.getItem('just_updated');
+    
+    if (lastSeenVersion !== data.version || justUpdated === 'true') {
+      setIsOpen(true);
+    }
+  }, [data.version]);
 
   const handleClose = () => {
-    if (data) {
-      // Lưu lại phiên bản đã xem để không hiện lại lần sau
-      localStorage.setItem('last_seen_version', data.version);
-      localStorage.removeItem('just_updated');
-    }
+    // Lưu lại phiên bản đã xem để không hiện lại lần sau
+    localStorage.setItem('last_seen_version', data.version);
+    localStorage.removeItem('just_updated');
     setIsOpen(false);
   };
 

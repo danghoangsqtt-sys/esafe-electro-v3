@@ -1,10 +1,10 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { VectorChunk, PdfMetadata } from "../types";
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/build/pdf";
+import * as pdfjsLib from "pdfjs-dist";
 
-// Sửa lỗi: Đổi 'any' thành 'ajax' trong URL cdnjs
-GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 const parsePdfDate = (dateStr: string | undefined): string => {
   if (!dateStr) return '';
@@ -15,38 +15,48 @@ const parsePdfDate = (dateStr: string | undefined): string => {
   return dateStr;
 };
 
-export const extractDataFromPDF = async (file: File): Promise<{ text: string; metadata: PdfMetadata }> => {
-  console.debug("[DHSYSTEM-DEBUG] Starting PDF extraction for:", file.name);
-  const arrayBuffer = await file.arrayBuffer();
-  let pdf = await getDocument(arrayBuffer).promise;
-  console.debug(`[DHSYSTEM-DEBUG] PDF loaded. Pages: ${pdf.numPages}`);
-  
-  let metadata: PdfMetadata = {};
+export const extractDataFromPDF = async (fileOrUrl: File | string): Promise<{ text: string; metadata: PdfMetadata }> => {
   try {
-    const data = await pdf.getMetadata();
-    if (data?.info) {
-      const info = data.info as any;
-      metadata = {
-        title: info.Title || '',
-        author: info.Author || '',
-        creationDate: parsePdfDate(info.CreationDate),
-        producer: info.Producer || ''
-      };
-      console.debug("[DHSYSTEM-DEBUG] Metadata extracted:", metadata);
+    let data;
+    if (typeof fileOrUrl === 'string') {
+        const response = await fetch(fileOrUrl);
+        const blob = await response.blob();
+        data = await blob.arrayBuffer();
+    } else {
+        data = await fileOrUrl.arrayBuffer();
     }
-  } catch (e) {
-    console.warn("[DHSYSTEM-DEBUG] Metadata extraction failed:", e);
+
+    const loadingTask = pdfjsLib.getDocument({
+      data: data,
+      useWorkerFetch: true,
+      isEvalSupported: false,
+    });
+    
+    let pdf = await loadingTask.promise;
+    let metadata: PdfMetadata = {};
+    try {
+      const meta = await pdf.getMetadata();
+      if (meta?.info) {
+        const info = meta.info as any;
+        metadata = {
+          title: info.Title || '',
+          author: info.Author || '',
+          creationDate: parsePdfDate(info.CreationDate),
+          producer: info.Producer || ''
+        };
+      }
+    } catch (e) {}
+    
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n";
+    }
+    return { text: fullText, metadata };
+  } catch (error) {
+    throw error;
   }
-  
-  let fullText = "";
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    fullText += textContent.items.map((item: any) => item.str).join(" ") + "\n";
-  }
-  
-  console.debug(`[DHSYSTEM-DEBUG] Extraction complete. Total characters: ${fullText.length}`);
-  return { text: fullText, metadata };
 };
 
 export const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -54,8 +64,7 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
     return text;
 }
 
-export const chunkText = (text: string, targetChunkSize: number = 800, overlap: number = 150): string[] => {
-  console.debug(`[DHSYSTEM-DEBUG] Chunking text. Target size: ${targetChunkSize}, Overlap: ${overlap}`);
+export const chunkText = (text: string, targetChunkSize: number = 1000, overlap: number = 200): string[] => {
   const cleanText = text.replace(/\s+/g, ' ').trim();
   const sentences = cleanText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleanText];
   const chunks: string[] = [];
@@ -70,7 +79,6 @@ export const chunkText = (text: string, targetChunkSize: number = 800, overlap: 
     }
   }
   if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
-  console.debug(`[DHSYSTEM-DEBUG] Chunking complete. Generated ${chunks.length} chunks.`);
   return chunks;
 };
 
@@ -81,16 +89,10 @@ export const embedChunks = async (
 ): Promise<VectorChunk[]> => {
   const manualKey = localStorage.getItem('manual_api_key');
   const apiKey = manualKey || process.env.API_KEY;
-  
-  if (!apiKey) {
-    console.error("[DHSYSTEM-DEBUG] Embedding failed: API Key not found.");
-    throw new Error("Missing API Key for embedding.");
-  }
+  if (!apiKey) throw new Error("Missing API Key.");
 
   const ai = new GoogleGenAI({ apiKey });
   const vectorChunks: VectorChunk[] = [];
-
-  console.debug(`[DHSYSTEM-DEBUG] Embedding ${textChunks.length} chunks for docId: ${docId}`);
 
   for (let i = 0; i < textChunks.length; i++) {
     try {
@@ -107,13 +109,17 @@ export const embedChunks = async (
           embedding: embedding.values
         });
       }
-    } catch (e) {
-      console.error(`[DHSYSTEM-DEBUG] Embedding failed at chunk ${i}:`, e);
+    } catch (e: any) {
+      console.error(`Embedding failed at chunk ${i}:`, e);
+      if (e.toString().includes('429')) {
+        await new Promise(r => setTimeout(r, 10000));
+        i--;
+        continue;
+      }
     }
     if (onProgress) onProgress(Math.round(((i + 1) / textChunks.length) * 100));
-    await new Promise(r => setTimeout(r, 20)); 
+    await new Promise(r => setTimeout(r, 1000)); 
   }
-  console.debug(`[DHSYSTEM-DEBUG] Successfully embedded ${vectorChunks.length} chunks.`);
   return vectorChunks;
 };
 
@@ -132,7 +138,6 @@ export const findRelevantChunks = async (
   topK: number = 5
 ): Promise<VectorChunk[]> => {
   if (knowledgeBase.length === 0) return [];
-  
   const manualKey = localStorage.getItem('manual_api_key');
   const apiKey = manualKey || process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey! });
@@ -145,15 +150,12 @@ export const findRelevantChunks = async (
     const queryVector = response.embeddings?.[0]?.values;
     if (!queryVector) return [];
 
-    console.debug("[DHSYSTEM-DEBUG] Semantic Search query embedded. Computing similarities...");
-
     return knowledgeBase
       .map(chunk => ({ chunk, score: cosineSimilarity(queryVector, chunk.embedding) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)
       .map(item => item.chunk);
   } catch (e) {
-    console.error("[DHSYSTEM-DEBUG] Query embedding failed", e);
     return [];
   }
 };

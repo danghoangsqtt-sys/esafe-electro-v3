@@ -304,7 +304,7 @@ const UserGuide: React.FC = () => {
 
       <div className="text-center p-10 bg-gray-100/50 rounded-[3rem] border border-dashed border-gray-200">
         <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Hỗ trợ kỹ thuật 24/7</p>
-        <p className="text-sm text-gray-600 font-bold mt-2">Mọi thắc mắc vui lòng liên hệ: support@e-safepower.edu.vn</p>
+        <p className="text-sm text-gray-600 font-bold mt-2">Mọi thắc mắc vui lòng liên hệ: thedreamneverend@gmail.com</p>
       </div>
     </div>
   );

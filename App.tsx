@@ -31,6 +31,14 @@ const SidebarLink = ({ to, icon, label }: { to: string, icon: string, label: str
 };
 
 const Dashboard = ({ questions, knowledgeBase }: any) => {
+    const [hasApiKey, setHasApiKey] = useState(!!localStorage.getItem('manual_api_key'));
+
+    useEffect(() => {
+        const checkKey = () => setHasApiKey(!!localStorage.getItem('manual_api_key'));
+        window.addEventListener('storage', checkKey);
+        return () => window.removeEventListener('storage', checkKey);
+    }, []);
+
     return (
         <div className="p-6 md:p-8 space-y-8 animate-fade-in main-container">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
@@ -40,6 +48,40 @@ const Dashboard = ({ questions, knowledgeBase }: any) => {
                   <p className="text-slate-500 font-medium mt-2">Hệ thống giáo dục chuyên sâu về An toàn điện & Môi trường.</p>
                 </div>
             </header>
+
+            {/* API KEY WARNING SECTION */}
+            {!hasApiKey && (
+                <div className="bg-amber-50 border-2 border-amber-200 rounded-[2.5rem] p-8 relative overflow-hidden shadow-xl shadow-amber-900/5 animate-fade-in-up">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-amber-200/20 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                    <div className="flex flex-col lg:flex-row items-center gap-8 relative z-10">
+                        <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-amber-500 text-3xl shadow-lg border border-amber-100 shrink-0">
+                            <i className="fas fa-triangle-exclamation animate-pulse"></i>
+                        </div>
+                        <div className="flex-1 text-center lg:text-left">
+                            <h3 className="text-xl font-black text-amber-900 mb-2">Hệ thống AI chưa được kích hoạt!</h3>
+                            <p className="text-sm text-amber-700 font-medium leading-relaxed max-w-2xl">
+                                Để sử dụng các tính năng Trợ lý AI, Biên soạn đề thi tự động và Vấn đáp giọng nói, bạn cần cấu hình <strong>Google Gemini API Key</strong>. Đây là dịch vụ miễn phí từ Google dành cho học tập.
+                            </p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+                            <a 
+                                href="https://aistudio.google.com/app/apikey" 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="bg-white text-amber-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-amber-200 shadow-sm hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
+                            >
+                                <i className="fas fa-external-link-alt"></i> Lấy mã API miễn phí
+                            </a>
+                            <Link 
+                                to="/settings"
+                                className="bg-amber-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-900/20 hover:bg-amber-700 transition-all flex items-center justify-center gap-2"
+                            >
+                                <i className="fas fa-cog"></i> Cấu hình ngay
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard icon="fa-layer-group" color="blue" label="Câu hỏi học tập" value={questions.length} />

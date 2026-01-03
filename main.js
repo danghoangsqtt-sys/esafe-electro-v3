@@ -14,6 +14,24 @@ function logToFile(msg) {
   }
 }
 
+// IPC handler để lưu file vào thư mục userData/documents
+ipcMain.handle('save-pdf', async (event, { fileName, base64Data }) => {
+  try {
+    const docsDir = path.join(app.getPath('userData'), 'documents');
+    if (!fs.existsSync(docsDir)) {
+      fs.mkdirSync(docsDir, { recursive: true });
+    }
+    const filePath = path.join(docsDir, fileName);
+    const buffer = Buffer.from(base64Data, 'base64');
+    fs.writeFileSync(filePath, buffer);
+    logToFile(`Saved PDF to: ${filePath}`);
+    return { success: true, filePath: `file://${filePath}` };
+  } catch (err) {
+    logToFile(`Error saving PDF: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+});
+
 function createWindow() {
   logToFile("Initializing Main Window...");
   
@@ -23,14 +41,13 @@ function createWindow() {
     show: false,
     backgroundColor: '#0f172a',
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
+      nodeIntegration: true, // Cho phép sử dụng IPC trong renderer
+      contextIsolation: false,
       webSecurity: false, 
       devTools: true
     }
   });
 
-  // Tự động cấp quyền Media cho Vấn đáp AI
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
     if (permission === 'media') return true;
     return false;
@@ -41,13 +58,6 @@ function createWindow() {
     callback(false);
   });
 
-  // Xử lý sự cố nạp tệp
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    logToFile(`FAILED TO LOAD CONTENT: ${errorCode} - ${errorDescription}`);
-  });
-
-  // --- QUAN TRỌNG: CHỈNH SỬA ĐƯỜNG DẪN NẠP FILE ---
-  // Kiểm tra nếu app đã đóng gói (Packaged) thì nạp từ thư mục dist
   const isPackaged = app.isPackaged;
   const indexPath = isPackaged 
     ? path.join(__dirname, 'dist', 'index.html') 
@@ -64,18 +74,8 @@ function createWindow() {
     logToFile("Application Window is now visible.");
   });
 
-  // Phím tắt Debug
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.key === 'F12') {
-      mainWindow.webContents.openDevTools();
-      logToFile("DevTools toggled by user (F12)");
-    }
-  });
-
   mainWindow.setMenuBarVisibility(false);
 }
-
-app.commandLine.appendSwitch('ignore-certificate-errors');
 
 app.whenReady().then(() => {
   logToFile("System Kernel Ready.");

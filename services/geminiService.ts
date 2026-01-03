@@ -4,13 +4,13 @@ import { Question, QuestionType, VectorChunk, AppSettings } from "../types";
 import { findRelevantChunks } from "./documentProcessor";
 
 const DEFAULT_SETTINGS: AppSettings = {
-  modelName: "gemini-3-pro-preview",
+  modelName: "gemini-3-flash-preview", 
   aiVoice: "Zephyr",
-  temperature: 0.6,
-  maxOutputTokens: 2500,
+  temperature: 0.7,
+  maxOutputTokens: 1024,
   autoSave: true,
-  ragTopK: 5,
-  thinkingBudget: 32768,
+  ragTopK: 3, 
+  thinkingBudget: 0, 
   systemExpertise: 'ACADEMIC'
 };
 
@@ -22,49 +22,29 @@ const getSettings = (): AppSettings => {
 const getAI = () => {
   const manualKey = localStorage.getItem('manual_api_key');
   const apiKey = manualKey || process.env.API_KEY;
-  
-  if (!apiKey) {
-    console.error("[DHSYSTEM-DEBUG] API Key missing!");
-    throw new Error("Chưa cấu hình API Key. Vui lòng vào Cài đặt.");
-  }
-  
-  console.debug("[DHSYSTEM-DEBUG] Initializing GoogleGenAI with key:", apiKey.substring(0, 8) + "...");
+  if (!apiKey) throw new Error("Chưa cấu hình API Key trong phần Cài đặt.");
   return new GoogleGenAI({ apiKey });
 };
 
+/**
+ * Rút gọn System Instruction: 
+ * Loại bỏ các từ ngữ thừa, tập trung vào từ khóa để giảm Input Tokens.
+ */
 const getSystemInstruction = (settings: AppSettings, contextText: string) => {
-  let instruction = `BẠN LÀ TRỢ LÝ AI CAO CẤP CỦA HỆ THỐNG E-SAFEPOWER, ĐƯỢC HUẤN LUYỆN CHUYÊN SÂU BỞI **DHSYSTEM**.
-  
-NHIỆM VỤ CỦA BẠN:
-1. Giải đáp các thắc mắc về môn học "Nguồn điện an toàn và môi trường".
-2. Hỗ trợ sinh viên và giảng viên tra cứu tiêu chuẩn an toàn (TCVN, IEC), quy trình vận hành và tác động môi trường của năng lượng.
-
-QUY TẮC PHẢN HỒI:
-- Luôn giữ thái độ chuyên nghiệp, chính xác và khoa học.
-- Sử dụng ngôn ngữ Tiếng Việt chuẩn mực.
-- **Định dạng văn bản:** Sử dụng Markdown để in đậm các từ khóa quan trọng (VD: **DHSYSTEM**, **An toàn điện**). Sử dụng danh sách (bullet points) để liệt kê quy trình.
-- **Công thức:** Luôn sử dụng LaTeX đặt trong dấu $ cho công thức dòng (inline) và $$ cho công thức khối (display). VD: $P = U \\cdot I \\cdot \\cos\\phi$.
-- **Danh tính:** Khi được hỏi về nguồn gốc, hãy khẳng định bạn là sản phẩm trí tuệ của **DHsystem**.
-
-PHONG CÁCH CHUYÊN MÔN: `;
-
-  switch(settings.systemExpertise) {
-    case 'ACADEMIC':
-      instruction += "Giảng viên Đại học - Tập trung vào lý thuyết hệ thống, chứng minh công thức và dẫn chứng tiêu chuẩn kỹ thuật.";
-      break;
-    case 'FIELD_EXPERT':
-      instruction += "Kỹ sư Trưởng - Tập trung vào kinh nghiệm thực tế, xử lý sự cố tại hiện trường và quy tắc an toàn bảo hộ.";
-      break;
-    case 'STUDENT_ASSISTANT':
-      instruction += "Trợ giảng - Giải thích đơn giản, ví dụ minh họa trực quan, hỗ trợ ôn thi hiệu quả.";
-      break;
-  }
-
+  let instruction = `Trợ lý E-SafePower (DHSYSTEM). Chuyên môn: Nguồn điện an toàn & môi trường. Trả lời ngắn gọn, dùng Markdown & LaTeX.`;
   if (contextText) {
-    instruction += `\n\nDƯỚI ĐÂY LÀ DỮ LIỆU TỪ GIÁO TRÌNH NỘI BỘ (Hãy ưu tiên sử dụng thông tin này): \n"""\n${contextText}\n"""`;
+    instruction += `\n\nNgữ cảnh tài liệu: ${contextText}`;
   }
-
   return instruction;
+};
+
+/**
+ * Kiểm tra xem tin nhắn có phải là tin nhắn rác/chào hỏi không 
+ * để tránh lãng phí Token gọi Embedding & RAG.
+ */
+const isTrivialMessage = (msg: string): boolean => {
+  const trivialPatterns = /^(xin chào|chào|hi|hello|hey|bye|tạm biệt|cảm ơn|thanks|ok|vâng|dạ)$/i;
+  return trivialPatterns.test(msg.trim()) || msg.trim().length < 4;
 };
 
 export const generateChatResponse = async (
@@ -73,50 +53,33 @@ export const generateChatResponse = async (
   config?: { temperature?: number; maxOutputTokens?: number; model?: string },
   knowledgeBase: VectorChunk[] = []
 ) => {
-  console.debug("[DHSYSTEM-DEBUG] generateChatResponse invoked. Message:", message);
   try {
     const ai = getAI();
     const settings = getSettings();
     let contextText = "";
     let ragSources: { uri: string; title: string }[] = [];
     
-    if (knowledgeBase.length > 0) {
-      console.debug("[DHSYSTEM-DEBUG] KnowledgeBase active. Searching for relevant chunks...");
+    if (knowledgeBase.length > 0 && !isTrivialMessage(message)) {
       try {
         const relevantChunks = await findRelevantChunks(message, knowledgeBase, settings.ragTopK);
-        console.debug(`[DHSYSTEM-DEBUG] RAG: Found ${relevantChunks.length} relevant chunks.`);
         if (relevantChunks.length > 0) {
-          contextText = relevantChunks.map(c => c.text).join("\n\n---\n\n");
+          contextText = relevantChunks.map(c => c.text).join("\n\n");
           ragSources = [{ uri: '#', title: 'Giáo trình E-SafePower' }];
         }
       } catch (e) {
-        console.error("[DHSYSTEM-DEBUG] RAG Retrieval failed", e);
+        console.warn("[DHSYSTEM] RAG bypassed due to error.");
       }
     }
 
-    const modelName = settings.modelName; 
+    const modelName = config?.model || settings.modelName; 
     const systemInstruction = getSystemInstruction(settings, contextText);
-
-    // Tính toán token dự phòng cho thinking
-    // maxOutputTokens thực tế = Số token mong muốn trả về + Budget suy nghĩ
-    const requestedOutputTokens = config?.maxOutputTokens ?? settings.maxOutputTokens;
-    const thinkingBudget = settings.thinkingBudget > 0 && (modelName.includes('pro') || modelName.includes('gemini-3')) 
-      ? settings.thinkingBudget 
-      : 0;
 
     const generationConfig: any = {
       systemInstruction,
-      temperature: config?.temperature ?? settings.temperature,
-      maxOutputTokens: requestedOutputTokens + thinkingBudget,
-      tools: [{ googleSearch: {} }],
+      temperature: config?.temperature || settings.temperature,
+      maxOutputTokens: config?.maxOutputTokens || settings.maxOutputTokens,
+      tools: [], 
     };
-
-    if (thinkingBudget > 0) {
-      generationConfig.thinkingConfig = { thinkingBudget: thinkingBudget };
-      console.debug(`[DHSYSTEM-DEBUG] Model supports thinking. Budget: ${thinkingBudget}, Total MaxTokens: ${generationConfig.maxOutputTokens}`);
-    }
-
-    console.debug("[DHSYSTEM-DEBUG] API Parameters:", { model: modelName, config: generationConfig });
 
     const response = await ai.models.generateContent({
       model: modelName,
@@ -124,34 +87,24 @@ export const generateChatResponse = async (
       config: generationConfig,
     });
 
-    console.debug("[DHSYSTEM-DEBUG] API Response received successfully.");
-
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const webSources = groundingChunks
-      .filter((c: any) => c.web?.uri)
-      .map((c: any) => ({ uri: c.web.uri, title: c.web.title }));
-
     return {
       text: response.text,
-      sources: [...ragSources, ...webSources]
+      sources: ragSources
     };
   } catch (error: any) {
-    console.error("[DHSYSTEM-DEBUG] generateChatResponse Error:", error);
+    console.error("[DHSYSTEM-DEBUG] Error:", error);
     throw error;
   }
 };
 
 export const generateQuestionsByAI = async (
-  topicOrContext: string,
+  promptText: string,
   count: number,
   difficulty: string
 ): Promise<Partial<Question>[]> => {
-  console.debug("[DHSYSTEM-DEBUG] generateQuestionsByAI topic:", topicOrContext, "count:", count);
   try {
     const ai = getAI();
     const settings = getSettings();
-    const modelName = settings.modelName;
-
     const responseSchema = {
       type: Type.ARRAY,
       items: {
@@ -170,19 +123,16 @@ export const generateQuestionsByAI = async (
     };
 
     const response = await ai.models.generateContent({
-      model: modelName,
-      contents: `Hãy đóng vai chuyên gia giáo dục của DHsystem. Dựa vào yêu cầu: ${topicOrContext}. Tạo ${count} câu hỏi độ khó ${difficulty}. Trả về JSON theo schema.`,
+      model: settings.modelName,
+      contents: promptText,
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        temperature: 0.8,
+        temperature: 0.7,
       },
     });
-
-    console.debug("[DHSYSTEM-DEBUG] Raw JSON Questions:", response.text);
     return JSON.parse(response.text || "[]");
   } catch (error) {
-    console.error("[DHSYSTEM-DEBUG] Question Generation failed:", error);
     throw error;
   }
 };
@@ -192,32 +142,16 @@ export const evaluateOralAnswer = async (
     correctAnswerOrContext: string,
     userAnswer: string
 ): Promise<{ score: number; feedback: string }> => {
-    console.debug("[DHSYSTEM-DEBUG] Evaluating Answer for Q:", question);
     try {
       const ai = getAI();
       const settings = getSettings();
-      const modelName = settings.modelName;
-
-      const prompt = `DHsystem AI Assessor. 
-      Q: "${question}"
-      Key: "${correctAnswerOrContext}"
-      Student Answer: "${userAnswer}"
-      Chấm điểm từ 0-10 và nhận xét chi tiết. Chú trọng tính chính xác về thuật ngữ an toàn điện.
-      Trả về JSON: {"score": number, "feedback": string}`;
-
       const response = await ai.models.generateContent({
-          model: modelName,
-          contents: prompt,
-          config: { 
-            responseMimeType: "application/json",
-            temperature: 0.3,
-          }
+          model: settings.modelName,
+          contents: `Chấm điểm: Q: "${question}", Key: "${correctAnswerOrContext}", User: "${userAnswer}". Trả về JSON: {"score": number, "feedback": string}`,
+          config: { responseMimeType: "application/json", temperature: 0.2 }
       });
-
-      console.debug("[DHSYSTEM-DEBUG] Evaluation result:", response.text);
       return JSON.parse(response.text || "{}");
     } catch (error) {
-      console.error("[DHSYSTEM-DEBUG] Evaluation Error:", error);
       throw error;
     }
 };
