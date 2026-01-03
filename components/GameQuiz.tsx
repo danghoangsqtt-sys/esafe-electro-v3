@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Question, QuestionType, QuestionFolder } from '../types';
 import { evaluateOralAnswer } from '../services/geminiService';
@@ -48,6 +49,66 @@ const formatContent = (text: string) => {
   return <div dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
+/**
+ * Hook tùy chỉnh để quản lý Speech Recognition
+ */
+const useSpeechRecognition = (onTranscriptChange: (text: string) => void) => {
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'vi-VN';
+
+      recognition.onresult = (event: any) => {
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        onTranscriptChange(fullTranscript);
+      };
+
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onend = () => setIsRecording(false);
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, [onTranscriptChange]);
+
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói (Speech Recognition API). Hãy thử Google Chrome.");
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+    } else {
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.error("Failed to start recognition", e);
+      }
+    }
+  };
+
+  const stopRecording = () => {
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  return { isRecording, toggleRecording, stopRecording };
+};
+
 // --- Timed Challenge Game (Thử Thách 60s) ---
 const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { userInfo: UserInfo, questions: Question[], onExit: () => void, onSaveScore: (s: string) => void }) => {
     const [currentIdx, setCurrentIdx] = useState(0);
@@ -55,29 +116,10 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
     const [gameState, setGameState] = useState<'PLAYING' | 'SUMMARY'>('PLAYING');
     const [scores, setScores] = useState<number[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
-    
-    // Voice/Input State
     const [transcript, setTranscript] = useState('');
-    const [isRecording, setIsRecording] = useState(false);
-    const recognitionRef = useRef<any>(null);
     const timerRef = useRef<any>(null);
 
-    useEffect(() => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = true;
-            recognitionRef.current.interimResults = true;
-            recognitionRef.current.lang = 'vi-VN';
-            recognitionRef.current.onresult = (event: any) => {
-                let current = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    current += event.results[i][0].transcript;
-                }
-                setTranscript(current);
-            };
-        }
-    }, []);
+    const { isRecording, toggleRecording, stopRecording } = useSpeechRecognition(setTranscript);
 
     useEffect(() => {
         if (gameState === 'PLAYING') {
@@ -102,8 +144,8 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
 
     const handleTimeOut = () => {
         clearInterval(timerRef.current);
-        if (isRecording) stopRecording();
-        setScores(prev => [...prev, 0]); // Zero score for timeout
+        stopRecording();
+        setScores(prev => [...prev, 0]);
         goToNext();
     };
 
@@ -114,22 +156,6 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
         } else {
             setGameState('SUMMARY');
         }
-    };
-
-    const toggleRecording = () => {
-        if (!recognitionRef.current) return;
-        if (isRecording) {
-            stopRecording();
-        } else {
-            setTranscript('');
-            recognitionRef.current.start();
-            setIsRecording(true);
-        }
-    };
-
-    const stopRecording = () => {
-        recognitionRef.current.stop();
-        setIsRecording(false);
     };
 
     const handleMultipleChoice = (selected: string) => {
@@ -144,7 +170,7 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
     const handleEssaySubmit = async () => {
         if (!transcript.trim() || isProcessing) return;
         clearInterval(timerRef.current);
-        if (isRecording) stopRecording();
+        stopRecording();
         setIsProcessing(true);
         
         try {
@@ -165,7 +191,7 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
             const avg = (total / questions.length).toFixed(1);
             onSaveScore(`Thử thách 60s: ${avg}/10`);
         }
-    }, [gameState]);
+    }, [gameState, scores, questions.length, onSaveScore]);
 
     if (gameState === 'SUMMARY') {
         const totalScore = scores.reduce((a, b) => a + b, 0);
@@ -174,9 +200,9 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
             <div className="min-h-full bg-slate-900 flex items-center justify-center p-6 text-white font-inter">
                 <div className="bg-slate-800 p-12 rounded-[3.5rem] border border-white/10 text-center max-w-2xl shadow-2xl">
                     <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce shadow-[0_0_50px_rgba(249,115,22,0.4)]">
-                        <i className="fas fa-bolt text-4xl"></i>
+                        <i className="fas fa-bolt text-4xl text-orange-500"></i>
                     </div>
-                    <h2 className="text-4xl font-black mb-4">THỬ THÁCH HOÀN TẤT</h2>
+                    <h2 className="text-4xl font-black mb-4 uppercase tracking-tight">THỬ THÁCH HOÀN TẤT</h2>
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-sm mb-12">{userInfo.name} - {userInfo.className}</p>
                     
                     <div className="grid grid-cols-2 gap-6 mb-12">
@@ -200,7 +226,6 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
 
     return (
         <div className="min-h-full bg-slate-950 text-white flex flex-col font-inter">
-            {/* Top Bar with Timer */}
             <div className="p-6 flex justify-between items-center border-b border-white/5 bg-slate-900/50 backdrop-blur-md sticky top-0 z-20">
                 <div className="flex items-center gap-4">
                     <button onClick={onExit} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition">
@@ -286,169 +311,21 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
     );
 };
 
-// --- Flashcard Game (Thẻ Ghi Nhớ) ---
-const FlashcardGame = ({ questions, onExit }: { questions: Question[], onExit: () => void }) => {
-    const [currentIdx, setCurrentIdx] = useState(0);
-    const [isFlipped, setIsFlipped] = useState(false);
-
-    const handleNext = () => {
-        if (currentIdx < questions.length - 1) {
-            setIsFlipped(false);
-            setTimeout(() => setCurrentIdx(currentIdx + 1), 150);
-        }
-    };
-
-    const handlePrev = () => {
-        if (currentIdx > 0) {
-            setIsFlipped(false);
-            setTimeout(() => setCurrentIdx(currentIdx - 1), 150);
-        }
-    };
-
-    const q = questions[currentIdx];
-
-    return (
-        <div className="min-h-full bg-slate-50 flex flex-col items-center p-8 animate-fade-in font-inter overflow-hidden">
-            <header className="w-full max-w-4xl flex justify-between items-center mb-12">
-                <button onClick={onExit} className="bg-white hover:bg-gray-100 px-6 py-2 rounded-xl border border-gray-200 font-black text-[10px] uppercase tracking-widest transition shadow-sm text-gray-500">
-                    <i className="fas fa-arrow-left mr-2"></i> Trở về
-                </button>
-                <div className="text-center">
-                    <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Thẻ Ghi Nhớ</h2>
-                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em]">{currentIdx + 1} / {questions.length} Thẻ</p>
-                </div>
-                <div className="w-[80px]"></div> {/* Spacer */}
-            </header>
-
-            <div className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center gap-12">
-                {/* 3D Card Container */}
-                <div 
-                    className="w-full aspect-[4/3] perspective-1000 cursor-pointer group"
-                    onClick={() => setIsFlipped(!isFlipped)}
-                >
-                    <div className={`relative w-full h-full transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-                        {/* Front Side */}
-                        <div className="absolute inset-0 backface-hidden bg-white rounded-[3rem] shadow-2xl border border-gray-100 flex flex-col p-12 items-center justify-center text-center">
-                            <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-8">Câu hỏi</span>
-                            <div className="text-2xl md:text-3xl font-bold text-slate-800 leading-relaxed math-content">
-                                {formatContent(q?.content)}
-                            </div>
-                            <div className="mt-auto pt-8 flex items-center gap-2 text-gray-300 font-bold text-[10px] uppercase tracking-widest group-hover:text-blue-400 transition-colors">
-                                <i className="fas fa-sync-alt animate-spin-slow"></i> Chạm để lật xem đáp án
-                            </div>
-                        </div>
-
-                        {/* Back Side */}
-                        <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-blue-600 to-indigo-800 rounded-[3rem] shadow-2xl rotate-y-180 flex flex-col p-12 items-center justify-center text-center text-white">
-                            <span className="bg-white/20 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-8">Đáp án đúng</span>
-                            <div className="bg-white/10 p-8 rounded-3xl border border-white/20 w-full mb-6">
-                                <div className="text-2xl md:text-4xl font-black math-content">
-                                    {formatContent(q?.correctAnswer)}
-                                </div>
-                            </div>
-                            {q?.explanation && (
-                                <div className="max-w-md">
-                                    <div className="text-xs text-blue-100 italic leading-relaxed">
-                                        <span className="font-black not-italic opacity-50 uppercase mr-1">Giải thích:</span> 
-                                        {formatContent(q.explanation)}
-                                    </div>
-                                </div>
-                            )}
-                            <div className="mt-auto pt-8 text-[10px] font-black text-blue-200/50 uppercase tracking-widest">
-                                Chạm để quay lại câu hỏi
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Controls */}
-                <div className="flex items-center gap-8">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); handlePrev(); }}
-                        disabled={currentIdx === 0}
-                        className="w-16 h-16 rounded-full bg-white border border-gray-200 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-xl transition-all disabled:opacity-20 disabled:cursor-not-allowed shadow-sm"
-                    >
-                        <i className="fas fa-chevron-left text-xl"></i>
-                    </button>
-                    
-                    <div className="flex gap-2">
-                        {questions.map((_, i) => (
-                            <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === currentIdx ? 'bg-blue-600 scale-150' : 'bg-gray-200'}`}></div>
-                        ))}
-                    </div>
-
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); handleNext(); }}
-                        disabled={currentIdx === questions.length - 1}
-                        className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 hover:shadow-2xl shadow-lg transition-all disabled:opacity-20 disabled:cursor-not-allowed"
-                    >
-                        <i className="fas fa-chevron-right text-xl"></i>
-                    </button>
-                </div>
-            </div>
-
-            {currentIdx === questions.length - 1 && isFlipped && (
-                <div className="mt-12 animate-fade-in-up">
-                    <button 
-                        onClick={onExit}
-                        className="bg-green-600 text-white px-12 py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl hover:bg-green-700 transition-all transform hover:scale-105"
-                    >
-                        Hoàn thành buổi học
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-};
-
 // --- Oral Game (Vấn Đáp AI) ---
 const OralGame = ({ userInfo, questions, onExit, onSaveScore }: { userInfo: UserInfo, questions: Question[], onExit: () => void, onSaveScore: (s: string) => void }) => {
     const [currentIdx, setCurrentIdx] = useState(0);
-    const [isRecording, setIsRecording] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [evaluation, setEvaluation] = useState<{score: number, feedback: string} | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [scores, setScores] = useState<number[]>([]);
     const [gameState, setGameState] = useState<'PLAYING' | 'SUMMARY'>('PLAYING');
 
-    const recognitionRef = useRef<any>(null);
-
-    useEffect(() => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = true;
-            recognitionRef.current.interimResults = true;
-            recognitionRef.current.lang = 'vi-VN';
-
-            recognitionRef.current.onresult = (event: any) => {
-                let current = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    current += event.results[i][0].transcript;
-                }
-                setTranscript(current);
-            };
-
-            recognitionRef.current.onerror = () => setIsRecording(false);
-            recognitionRef.current.onend = () => setIsRecording(false);
-        }
-    }, []);
-
-    const toggleRecording = () => {
-        if (!recognitionRef.current) return alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói.");
-        if (isRecording) {
-            recognitionRef.current.stop();
-            setIsRecording(false);
-        } else {
-            setTranscript('');
-            recognitionRef.current.start();
-            setIsRecording(true);
-        }
-    };
+    const { isRecording, toggleRecording, stopRecording } = useSpeechRecognition(setTranscript);
 
     const handleEvaluate = async () => {
         if (!transcript.trim() || isLoading) return;
         setIsLoading(true);
+        stopRecording();
         try {
             const currentQ = questions[currentIdx];
             const result = await evaluateOralAnswer(currentQ.content, currentQ.correctAnswer, transcript);
@@ -482,7 +359,7 @@ const OralGame = ({ userInfo, questions, onExit, onSaveScore }: { userInfo: User
                     <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(37,99,235,0.4)]">
                         <i className="fas fa-award text-4xl"></i>
                     </div>
-                    <h2 className="text-4xl font-black mb-2">HOÀN THÀNH VẤN ĐÁP</h2>
+                    <h2 className="text-4xl font-black mb-2 uppercase tracking-tight">HOÀN THÀNH VẤN ĐÁP</h2>
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-sm mb-12">{userInfo.name} - {userInfo.className}</p>
                     
                     <div className="grid grid-cols-2 gap-8 mb-12">
@@ -531,7 +408,7 @@ const OralGame = ({ userInfo, questions, onExit, onSaveScore }: { userInfo: User
                         <textarea 
                             value={transcript}
                             onChange={(e) => setTranscript(e.target.value)}
-                            placeholder="Nhấn vào biểu tượng Micro và bắt đầu nói câu trả lời của bạn..."
+                            placeholder="Nhấn vào biểu tượng Micro và bắt đầu nói câu trả lời của bạn (Hệ thống hỗ trợ Tiếng Việt)..."
                             className="w-full h-48 bg-white/5 border-2 border-white/10 rounded-[2.5rem] p-8 text-lg font-medium outline-none focus:border-blue-500 transition-all resize-none"
                         />
                         <button 
@@ -767,12 +644,110 @@ const MillionaireGame = ({ userInfo, questions, onExit, onSaveScore }: { userInf
     );
 };
 
+// --- Flashcard Game (Thẻ Ghi Nhớ) ---
+const FlashcardGame = ({ questions, onExit }: { questions: Question[], onExit: () => void }) => {
+    const [currentIdx, setCurrentIdx] = useState(0);
+    const [isFlipped, setIsFlipped] = useState(false);
+
+    const handleNext = () => {
+        if (currentIdx < questions.length - 1) {
+            setIsFlipped(false);
+            setTimeout(() => setCurrentIdx(currentIdx + 1), 150);
+        }
+    };
+
+    const handlePrev = () => {
+        if (currentIdx > 0) {
+            setIsFlipped(false);
+            setTimeout(() => setCurrentIdx(currentIdx - 1), 150);
+        }
+    };
+
+    const q = questions[currentIdx];
+
+    return (
+        <div className="min-h-full bg-slate-50 flex flex-col items-center p-8 animate-fade-in font-inter overflow-hidden">
+            <header className="w-full max-w-4xl flex justify-between items-center mb-12">
+                <button onClick={onExit} className="bg-white hover:bg-gray-100 px-6 py-2 rounded-xl border border-gray-200 font-black text-[10px] uppercase tracking-widest transition shadow-sm text-gray-500">
+                    <i className="fas fa-arrow-left mr-2"></i> Trở về
+                </button>
+                <div className="text-center">
+                    <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Thẻ Ghi Nhớ</h2>
+                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.2em]">{currentIdx + 1} / {questions.length} Thẻ</p>
+                </div>
+                <div className="w-[80px]"></div>
+            </header>
+
+            <div className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center gap-12">
+                <div 
+                    className="w-full aspect-[4/3] perspective-1000 cursor-pointer group"
+                    onClick={() => setIsFlipped(!isFlipped)}
+                >
+                    <div className={`relative w-full h-full transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                        <div className="absolute inset-0 backface-hidden bg-white rounded-[3rem] shadow-2xl border border-gray-100 flex flex-col p-12 items-center justify-center text-center">
+                            <span className="bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-8">Câu hỏi</span>
+                            <div className="text-2xl md:text-3xl font-bold text-slate-800 leading-relaxed math-content">
+                                {formatContent(q?.content)}
+                            </div>
+                            <div className="mt-auto pt-8 flex items-center gap-2 text-gray-300 font-bold text-[10px] uppercase tracking-widest group-hover:text-blue-400 transition-colors">
+                                <i className="fas fa-sync-alt animate-spin-slow"></i> Chạm để lật xem đáp án
+                            </div>
+                        </div>
+
+                        <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-blue-600 to-indigo-800 rounded-[3rem] shadow-2xl rotate-y-180 flex flex-col p-12 items-center justify-center text-center text-white">
+                            <span className="bg-white/20 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-8">Đáp án đúng</span>
+                            <div className="bg-white/10 p-8 rounded-3xl border border-white/20 w-full mb-6">
+                                <div className="text-2xl md:text-4xl font-black math-content">
+                                    {formatContent(q?.correctAnswer)}
+                                </div>
+                            </div>
+                            {q?.explanation && (
+                                <div className="max-w-md">
+                                    <div className="text-xs text-blue-100 italic leading-relaxed">
+                                        <span className="font-black not-italic opacity-50 uppercase mr-1">Giải thích:</span> 
+                                        {formatContent(q.explanation)}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="mt-auto pt-8 text-[10px] font-black text-blue-200/50 uppercase tracking-widest">
+                                Chạm để quay lại câu hỏi
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-8">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handlePrev(); }}
+                        disabled={currentIdx === 0}
+                        className="w-16 h-16 rounded-full bg-white border border-gray-200 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-xl transition-all disabled:opacity-20 disabled:cursor-not-allowed shadow-sm"
+                    >
+                        <i className="fas fa-chevron-left text-xl"></i>
+                    </button>
+                    
+                    <div className="flex gap-2">
+                        {questions.map((_, i) => (
+                            <div key={i} className={`w-2 h-2 rounded-full transition-all ${i === currentIdx ? 'bg-blue-600 scale-150' : 'bg-gray-200'}`}></div>
+                        ))}
+                    </div>
+
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleNext(); }}
+                        disabled={currentIdx === questions.length - 1}
+                        className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 hover:shadow-2xl shadow-lg transition-all disabled:opacity-20 disabled:cursor-not-allowed"
+                    >
+                        <i className="fas fa-chevron-right text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- Main Container ---
 const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
   const [mode, setMode] = useState<GameMode>('LOBBY');
   const [targetGame, setTargetGame] = useState<GameMode>('LOBBY');
-  
-  // Game Configuration State
   const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>(['all']);
   const [questionLimit, setQuestionLimit] = useState<number>(10);
   const [userInfo, setUserInfo] = useState<UserInfo>(() => {
@@ -785,7 +760,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
       return saved ? JSON.parse(saved) : [];
   });
 
-  // Questions filtered based on setup
   const filteredQuestions = useMemo(() => {
     let base = questions;
     if (!selectedFolderIds.includes('all')) {
@@ -801,9 +775,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
     return [...base].sort(() => 0.5 - Math.random()).slice(0, questionLimit);
   }, [questions, selectedFolderIds, questionLimit, targetGame]);
 
-  /* Removed redundant maxAvailable useMemo block to resolve type errors on line 810 and 812 */
-
-  // Re-calculate maxAvailable properly
   const calculatedMax = useMemo(() => {
     let base = questions;
     if (!selectedFolderIds.includes('all')) {
@@ -832,7 +803,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
   const startSetup = (game: GameMode) => {
       setTargetGame(game);
       setMode('SETUP');
-      // Set reasonable defaults for each game type
       if (game === 'MILLIONAIRE') setQuestionLimit(Math.min(15, 15));
       else if (game === 'FLASHCARD') setQuestionLimit(Math.min(20, 20));
       else if (game === 'TIMED') setQuestionLimit(Math.min(10, 10));
@@ -855,7 +825,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
       });
   };
 
-  // Helper to count questions in a folder for the specific target game
   const getQuestionCountForFolder = (folderId: string | 'all') => {
       let base = questions;
       if (folderId !== 'all') {
@@ -887,7 +856,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                   </header>
 
                   <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
-                      {/* User Info Section */}
                       <div className="grid grid-cols-2 gap-6">
                           <div className="space-y-2">
                               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block ml-1">Họ tên người chơi</label>
@@ -911,16 +879,14 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                           </div>
                       </div>
 
-                      {/* Multi-Folder Selection List Section */}
                       <div className="space-y-4">
                           <div className="flex justify-between items-end">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block ml-1">Chọn nguồn câu hỏi (Nhiều thư mục)</label>
-                            <span className="text-[9px] font-black text-blue-500 uppercase italic">Bạn có thể chọn một hoặc nhiều bài học để ôn tập</span>
+                            <span className="text-[9px] font-black text-blue-500 uppercase italic">Hệ thống hỗ trợ Tiếng Việt và các công thức Điện học</span>
                           </div>
                           
                           <div className="bg-gray-50 rounded-[2.5rem] border border-gray-100 p-2 max-h-[300px] overflow-y-auto custom-scrollbar">
                               <div className="space-y-1.5">
-                                  {/* All Folders Option */}
                                   <button 
                                       onClick={() => toggleFolder('all')}
                                       className={`w-full flex items-center justify-between p-4 rounded-3xl transition-all ${selectedFolderIds.includes('all') ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-white/60 border border-gray-200/50 shadow-sm'}`}
@@ -945,7 +911,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                                   <div className="h-2"></div>
                                   <div className="px-4 text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Thư mục đề thi</div>
 
-                                  {/* Individual Folders */}
                                   {folders.map(f => {
                                       const isSelected = selectedFolderIds.includes(f.id);
                                       const count = getQuestionCountForFolder(f.id);
@@ -977,7 +942,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                           </div>
                       </div>
 
-                      {/* Question Limit Slider Section */}
                       <div className="space-y-4">
                           <div className="flex justify-between items-end">
                               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block ml-1">Số lượng câu hỏi lượt này</label>
@@ -994,7 +958,7 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                           <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
                              <p className="text-[10px] text-blue-700 font-bold leading-relaxed flex items-start gap-2">
                                 <i className="fas fa-info-circle mt-0.5"></i>
-                                <span>{targetGame === 'TIMED' ? 'Trận đấu 60s sẽ chọn ngẫu nhiên cả trắc nghiệm và tự luận từ danh sách thư mục bạn đã chọn.' : targetGame === 'ORAL' ? 'Hệ thống sẽ chỉ lấy các câu Tự luận từ nguồn bạn chọn để phục vụ thi Vấn đáp AI.' : 'Hệ thống sẽ chỉ lấy các câu Trắc nghiệm để phục vụ trò chơi này.'}</span>
+                                <span>{targetGame === 'TIMED' ? 'Trận đấu 60s sẽ hỗ trợ nhận diện giọng nói cho các câu tự luận.' : targetGame === 'ORAL' ? 'Hệ thống sẽ chỉ lấy các câu Tự luận từ nguồn bạn chọn để phục vụ thi Vấn đáp AI.' : 'Hệ thống sẽ chỉ lấy các câu Trắc nghiệm để phục vụ trò chơi này.'}</span>
                              </p>
                           </div>
                       </div>
@@ -1045,7 +1009,7 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                 />
                 <GameCard 
                     title="Vấn Đáp AI" 
-                    desc="Giám khảo AI trực tiếp đặt câu hỏi và chấm điểm giọng nói của bạn."
+                    desc="Giám khảo AI trực tiếp đặt câu hỏi và chấm điểm giọng nói Tiếng Việt của bạn."
                     icon="fa-headset"
                     color="from-purple-600 to-indigo-700"
                     count={questions.filter(q => q.type === QuestionType.ESSAY).length}
@@ -1063,7 +1027,7 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                 />
                 <GameCard 
                     title="Thử Thách 60s" 
-                    desc="Trả lời nhiều nhất có thể trong thời gian giới hạn 60 giây mỗi câu."
+                    desc="Hỗ trợ thu âm Tiếng Việt. Trả lời nhiều nhất có thể trong thời gian giới hạn."
                     icon="fa-stopwatch"
                     color="from-orange-500 to-red-700"
                     count={questions.length}
