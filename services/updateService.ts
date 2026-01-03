@@ -1,30 +1,29 @@
+
 import { AppVersionInfo } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
-// Số phiên bản này phải khớp với file version.json cục bộ
+// Phiên bản hiện tại của ứng dụng
 const CURRENT_VERSION = "2.1.0";
 
-// Lưu ý: Thay đổi URL này thành URL raw trên GitHub của bạn sau khi push code
+// URL chứa thông tin phiên bản từ xa (GitHub Raw)
 const REMOTE_VERSION_URL = "https://raw.githubusercontent.com/danghoangsqtt-sys/esafe-electro-v3/main/version.json";
 
 export const checkAppUpdate = async (): Promise<AppVersionInfo> => {
   console.debug("[DHSYSTEM-UPDATE] Checking for updates...");
   
   try {
-    // Trong thực tế, bạn sẽ fetch từ REMOTE_VERSION_URL
-    // Ở đây giả lập việc gọi API để bạn có thể test giao diện ngay
-    const response = await fetch(REMOTE_VERSION_URL).catch(() => null);
+    const response = await fetch(REMOTE_VERSION_URL + "?t=" + Date.now()).catch(() => null);
     
     let serverData;
     if (response && response.ok) {
         serverData = await response.json();
     } else {
-        // Dữ liệu giả lập nếu chưa có server thật để bạn thấy được logic
+        // Dữ liệu giả lập phục vụ UI nếu không kết nối được server
         serverData = {
-            version: "2.2.0", 
-            releaseDate: "2026-06-01",
-            changelog: "1. Nâng cấp engine Gemini 3 Pro.\n2. Tối ưu hóa tốc độ tải PDF.\n3. Thêm tính năng xuất báo cáo học tập.",
-            updateUrl: "https://github.com/danghoangsqtt-sys/esafe-electro-v3/releases/latest"
+            version: "2.1.0", // Mặc định bằng hiện tại để không hiện thông báo
+            releaseDate: "2026-03-01",
+            changelog: "Không có thông tin mới.",
+            updateUrl: "#"
         };
     }
 
@@ -52,21 +51,4 @@ const compareVersions = (v1: string, v2: string) => {
     if (parts1[i] < parts2[i]) return -1;
   }
   return 0;
-};
-
-export const summarizeUpdateWithAI = async (changelog: string): Promise<string> => {
-  const apiKey = localStorage.getItem('manual_api_key') || process.env.API_KEY;
-  if (!apiKey) return changelog;
-
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Hãy tóm tắt các điểm mới sau đây một cách ngắn gọn và chuyên nghiệp: \n\n${changelog}`,
-      config: { temperature: 0.5 }
-    });
-    return response.text || changelog;
-  } catch (e) {
-    return changelog;
-  }
 };

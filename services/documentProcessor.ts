@@ -3,7 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { VectorChunk, PdfMetadata } from "../types";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/build/pdf";
 
-GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/any/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+// Sửa lỗi: Đổi 'any' thành 'ajax' trong URL cdnjs
+GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
 
 const parsePdfDate = (dateStr: string | undefined): string => {
   if (!dateStr) return '';

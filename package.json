@@ -1,3 +1,4 @@
+
 {
   "name": "e-safepower-learning",
   "version": "2.1.0",
@@ -9,9 +10,19 @@
   },
   "author": "DHsystem",
   "license": "ISC",
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.6",
+    "@google/genai": "^1.30.0",
+    "pdfjs-dist": "^4.0.379",
+    "katex": "^0.16.9",
+    "uuid": "^13.0.0"
+  },
   "devDependencies": {
     "electron": "^31.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "vite": "^7.3.0"
   },
   "build": {
     "appId": "com.dhsystem.esafepower",

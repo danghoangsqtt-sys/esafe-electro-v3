@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Chatbot from './components/Chatbot';
 import QuestionGenerator from './components/QuestionGenerator';
@@ -9,7 +9,8 @@ import UserGuide from './components/UserGuide';
 import Settings from './components/Settings';
 import QuestionBankManager from './components/QuestionBankManager';
 import ChangelogModal from './components/ChangelogModal';
-import { Question, VectorChunk, QuestionFolder } from './types';
+import { Question, VectorChunk, QuestionFolder, AppVersionInfo } from './types';
+import { checkAppUpdate } from './services/updateService';
 
 const SidebarLink = ({ to, icon, label }: { to: string, icon: string, label: string }) => {
   const location = useLocation();
@@ -70,48 +71,33 @@ const StatCard = ({ icon, color, label, value }: any) => (
     </div>
 );
 
-const DebugConsole = ({ show, onClose }: { show: boolean, onClose: () => void }) => {
-    if (!show) return null;
-    return (
-        <div className="fixed top-0 right-0 w-80 h-full bg-slate-900/95 backdrop-blur-md z-[10000] border-l border-white/10 p-6 flex flex-col font-mono text-[10px] text-green-400">
-            <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                <span className="font-black text-white uppercase">System Debug logs</span>
-                <button onClick={onClose} className="text-white hover:text-red-500"><i className="fas fa-times"></i></button>
-            </div>
-            <div className="flex-1 overflow-auto custom-scrollbar space-y-2">
-                {(window as any).bootLogs?.map((log: string, i: number) => (
-                    <div key={i} className="opacity-80 border-b border-white/5 pb-1">{log}</div>
-                ))}
-            </div>
-            <div className="mt-4 pt-4 border-t border-white/10 text-white/50 text-[8px] uppercase">
-                DHsystem Diagnostics v2.0
-            </div>
-        </div>
-    );
-};
-
 const App: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>(() => JSON.parse(localStorage.getItem('questions') || '[]'));
   const [folders, setFolders] = useState<QuestionFolder[]>(() => JSON.parse(localStorage.getItem('question_folders') || '[{"id":"default","name":"Mặc định","createdAt":0}]'));
   const [knowledgeBase, setKnowledgeBase] = useState<VectorChunk[]>(() => JSON.parse(localStorage.getItem('knowledge_base') || '[]'));
   const [notifications, setNotifications] = useState<{ id: number, message: string, type: string }[]>([]);
-  const [showDebug, setShowDebug] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<AppVersionInfo | null>(null);
+
+  // Kiểm tra cập nhật ngầm khi khởi động
+  useEffect(() => {
+    const silentUpdateCheck = async () => {
+      try {
+        const info = await checkAppUpdate();
+        if (info.isUpdateAvailable) {
+          setPendingUpdate(info);
+        }
+      } catch (e) {
+        console.warn("Silent update check failed.");
+      }
+    };
+    silentUpdateCheck();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('questions', JSON.stringify(questions));
     localStorage.setItem('question_folders', JSON.stringify(folders));
     localStorage.setItem('knowledge_base', JSON.stringify(knowledgeBase));
   }, [questions, folders, knowledgeBase]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-            setShowDebug(prev => !prev);
-        }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const showNotify = (message: string, type: 'success' | 'error' | 'info' | 'warning') => {
     const id = Date.now();
@@ -122,19 +108,28 @@ const App: React.FC = () => {
   return (
     <Router>
       <div className="flex h-screen bg-slate-50 font-sans overflow-hidden relative">
-        <DebugConsole show={showDebug} onClose={() => setShowDebug(false)} />
         <ChangelogModal />
         
-        <div className="fixed top-6 right-6 z-[100] space-y-3 pointer-events-none">
+        {/* Biểu ngữ thông báo cập nhật mới (Chỉ hiện khi có bản mới) */}
+        {pendingUpdate && (
+          <div className="fixed top-0 left-0 w-full z-[1000] bg-blue-600 text-white p-2 text-center animate-fade-in flex items-center justify-center gap-4 shadow-xl">
+             <i className="fas fa-sparkles text-yellow-300"></i>
+             <span className="text-xs font-bold uppercase tracking-widest">Phát hiện phiên bản mới v{pendingUpdate.latestVersion} ({pendingUpdate.releaseDate})</span>
+             <Link to="/settings" onClick={() => setPendingUpdate(null)} className="bg-white text-blue-600 px-4 py-1 rounded-full text-[10px] font-black uppercase hover:bg-blue-50 transition-all">Xem ngay</Link>
+             <button onClick={() => setPendingUpdate(null)} className="text-white/50 hover:text-white"><i className="fas fa-times"></i></button>
+          </div>
+        )}
+
+        <div className="fixed top-12 right-6 z-[100] space-y-3 pointer-events-none">
             {notifications.map(n => (
                 <div key={n.id} className={`px-5 py-3.5 rounded-2xl shadow-xl border flex items-center gap-4 animate-fade-in-up pointer-events-auto bg-white min-w-[300px] border-${n.type === 'success' ? 'green' : n.type === 'error' ? 'red' : 'blue'}-100`}>
-                    <i className={`fas ${n.type === 'success' ? 'fa-check-circle text-green-500' : 'fa-info-circle text-blue-500'}`}></i>
+                    <i className={`fas ${n.type === 'success' ? 'fa-check-circle text-green-500' : n.type === 'error' ? 'fa-exclamation-circle text-red-500' : 'fa-info-circle text-blue-500'}`}></i>
                     <span className="text-sm font-medium text-slate-700">{n.message}</span>
                 </div>
             ))}
         </div>
 
-        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 z-20 shadow-sm overflow-y-auto">
+        <aside className={`w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 z-20 shadow-sm overflow-y-auto ${pendingUpdate ? 'pt-10' : ''}`}>
           <div className="p-8">
             <div className="flex items-center gap-3 text-blue-600 font-black">
               <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-lg shadow-blue-100">
@@ -162,7 +157,7 @@ const App: React.FC = () => {
           </div>
         </aside>
 
-        <main className="flex-1 flex flex-col h-full overflow-hidden">
+        <main className={`flex-1 flex flex-col h-full overflow-hidden ${pendingUpdate ? 'pt-10' : ''}`}>
             <div className="flex-1 overflow-auto custom-scrollbar">
                 <Routes>
                     <Route path="/" element={<Dashboard questions={questions} knowledgeBase={knowledgeBase} />} />

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DocumentFile, VectorChunk } from '../types';
 import { extractDataFromPDF, chunkText, embedChunks } from '../services/documentProcessor';
@@ -240,7 +241,6 @@ const Documents: React.FC<DocumentsProps> = ({ onUpdateKnowledgeBase, onDeleteDo
         setProgress(20);
         const chunks = chunkText(text);
         
-        // Fixed: removed redundant process.env.API_KEY parameter as embedChunks uses it directly
         const vectorChunks = await embedChunks(newDocId, chunks, (p) => {
             setProgress(20 + Math.round(p * 0.8));
         });

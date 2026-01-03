@@ -58,7 +58,21 @@ async function decodeAudioData(
   return buffer;
 }
 
-// Fix: Added React import above to resolve 'Cannot find namespace React' error.
+// AudioWorklet Processor Script as a string to create a Blob URL
+const WORKLET_CODE = `
+class AudioProcessor extends AudioWorkletProcessor {
+  process(inputs, outputs, parameters) {
+    const input = inputs[0];
+    if (input.length > 0) {
+      // Send the first channel data to the main thread
+      this.port.postMessage(input[0]);
+    }
+    return true;
+  }
+}
+registerProcessor('audio-input-processor', AudioProcessor);
+`;
+
 const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -67,7 +81,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const sessionRef = useRef<any>(null);
   const nextStartTimeRef = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
@@ -78,16 +92,15 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
        try {
            const session = await sessionRef.current;
            session.close();
-           console.debug("[DHSYSTEM-DEBUG] session.close() called.");
        } catch (e) {
            console.warn("[DHSYSTEM-DEBUG] Error closing session:", e);
        }
        sessionRef.current = null;
     }
 
-    if (processorRef.current) {
-        processorRef.current.disconnect();
-        processorRef.current = null;
+    if (workletNodeRef.current) {
+        workletNodeRef.current.disconnect();
+        workletNodeRef.current = null;
     }
     if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -106,7 +119,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
   };
 
   const startSession = async () => {
-    console.debug("[DHSYSTEM-DEBUG] Starting LiveChat session...");
+    console.debug("[DHSYSTEM-DEBUG] Starting LiveChat session with AudioWorklet...");
     setError(null);
     setIsInitializing(true);
 
@@ -134,6 +147,11 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
           throw new Error("Vui lòng cấp quyền Microphone.");
       }
 
+      // Load AudioWorklet
+      const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+      const workletUrl = URL.createObjectURL(blob);
+      await inputContextRef.current.audioWorklet.addModule(workletUrl);
+
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
@@ -150,25 +168,25 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                 setIsInitializing(false);
                 
                 if (!inputContextRef.current || !streamRef.current) return;
+                
                 const source = inputContextRef.current.createMediaStreamSource(streamRef.current);
-                const scriptProcessor = inputContextRef.current.createScriptProcessor(4096, 1, 1);
-                processorRef.current = scriptProcessor;
+                const workletNode = new AudioWorkletNode(inputContextRef.current, 'audio-input-processor');
+                workletNodeRef.current = workletNode;
 
-                scriptProcessor.onaudioprocess = (e) => {
-                    const inputData = e.inputBuffer.getChannelData(0);
+                workletNode.port.onmessage = (event) => {
+                    const inputData = event.data; // Float32Array from channel 0
                     const pcmBlob = createBlob(inputData);
-                    // CRITICAL: Ensure data is streamed only after the session promise resolves.
                     sessionPromise.then(session => {
                         session.sendRealtimeInput({ media: pcmBlob });
                     });
                 };
-                source.connect(scriptProcessor);
-                scriptProcessor.connect(inputContextRef.current.destination);
+
+                source.connect(workletNode);
+                workletNode.connect(inputContextRef.current.destination);
             },
             onmessage: async (message: LiveServerMessage) => {
                 const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
                 if (base64Audio) {
-                    console.debug("[DHSYSTEM-DEBUG] Audio chunk received. Decoding...");
                     if (audioContextRef.current) {
                         nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContextRef.current.currentTime);
                         const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
@@ -182,19 +200,16 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                     }
                 }
                 if (message.serverContent?.interrupted) {
-                     console.debug("[DHSYSTEM-DEBUG] Model interrupted. Stopping audio playback.");
                      sourcesRef.current.forEach(s => { try { s.stop(); } catch(e) {} });
                      sourcesRef.current.clear();
                      nextStartTimeRef.current = 0;
                 }
             },
             onclose: () => {
-                console.debug("[DHSYSTEM-DEBUG] Live session CLOSED.");
                 setIsConnected(false);
                 setIsInitializing(false);
             },
             onerror: async (err: any) => {
-                console.error("[DHSYSTEM-DEBUG] Live API Error event:", err);
                 setError("Lỗi kết nối AI. Vui lòng kiểm tra lại API Key.");
                 setIsConnected(false);
                 stopSession();
@@ -204,7 +219,6 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
       sessionRef.current = sessionPromise;
 
     } catch (err: any) {
-        console.error("[DHSYSTEM-DEBUG] Session Initialization failed:", err);
         setError(err.message || "Lỗi khởi tạo hội thoại.");
         setIsInitializing(false);
         stopSession();
@@ -225,9 +239,9 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
       </div>
 
       <div className="text-center space-y-2 mb-10">
-        <h3 className="text-2xl font-black">Giảng viên AI</h3>
+        <h3 className="text-2xl font-black">Giảng viên AI (DHSYSTEM)</h3>
         <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-            {isInitializing ? "Đang kết nối API..." : isConnected ? "Đang lắng nghe & Phản hồi" : "Sẵn sàng vấn đáp chuyên môn"}
+            {isInitializing ? "Đang khởi tạo Worklet..." : isConnected ? "Đang học tập trực tuyến" : "Vấn đáp bằng giọng nói (Công nghệ Low-Latency)"}
         </p>
       </div>
 
@@ -244,7 +258,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
             disabled={isInitializing}
             className="px-14 py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-500 transition-all shadow-xl flex items-center gap-3 active:scale-95 disabled:opacity-50 uppercase tracking-widest text-sm"
             >
-            <i className="fas fa-play"></i> BẮT ĐẦU HỌC
+            <i className="fas fa-play"></i> BẮT ĐẦU VẤN ĐÁP
             </button>
         ) : (
             <button
@@ -257,7 +271,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
       </div>
       
       <div className="mt-auto pt-6 text-[9px] text-white/20 font-black uppercase tracking-[0.3em] text-center">
-         Engine: Gemini 2.5 Native Audio
+         Audio Engine: Web Audio Worklet v2
       </div>
     </div>
   );

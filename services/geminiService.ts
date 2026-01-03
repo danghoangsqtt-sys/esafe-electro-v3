@@ -43,7 +43,7 @@ QUY TẮC PHẢN HỒI:
 - Luôn giữ thái độ chuyên nghiệp, chính xác và khoa học.
 - Sử dụng ngôn ngữ Tiếng Việt chuẩn mực.
 - **Định dạng văn bản:** Sử dụng Markdown để in đậm các từ khóa quan trọng (VD: **DHSYSTEM**, **An toàn điện**). Sử dụng danh sách (bullet points) để liệt kê quy trình.
-- **Công thức:** Luôn sử dụng LaTeX đặt trong dấu $ cho công thức dòng (inline) và $$ cho công thức khối (display). VD: $P = U \cdot I \cdot \cos\phi$.
+- **Công thức:** Luôn sử dụng LaTeX đặt trong dấu $ cho công thức dòng (inline) và $$ cho công thức khối (display). VD: $P = U \\cdot I \\cdot \\cos\\phi$.
 - **Danh tính:** Khi được hỏi về nguồn gốc, hãy khẳng định bạn là sản phẩm trí tuệ của **DHsystem**.
 
 PHONG CÁCH CHUYÊN MÔN: `;
@@ -97,16 +97,23 @@ export const generateChatResponse = async (
     const modelName = settings.modelName; 
     const systemInstruction = getSystemInstruction(settings, contextText);
 
+    // Tính toán token dự phòng cho thinking
+    // maxOutputTokens thực tế = Số token mong muốn trả về + Budget suy nghĩ
+    const requestedOutputTokens = config?.maxOutputTokens ?? settings.maxOutputTokens;
+    const thinkingBudget = settings.thinkingBudget > 0 && (modelName.includes('pro') || modelName.includes('gemini-3')) 
+      ? settings.thinkingBudget 
+      : 0;
+
     const generationConfig: any = {
       systemInstruction,
       temperature: config?.temperature ?? settings.temperature,
-      maxOutputTokens: (config?.maxOutputTokens ?? settings.maxOutputTokens),
+      maxOutputTokens: requestedOutputTokens + thinkingBudget,
       tools: [{ googleSearch: {} }],
     };
 
-    if (settings.thinkingBudget > 0 && (modelName.includes('pro') || modelName.includes('gemini-3'))) {
-      generationConfig.thinkingConfig = { thinkingBudget: settings.thinkingBudget };
-      console.debug(`[DHSYSTEM-DEBUG] Model supports thinking. Budget: ${settings.thinkingBudget}`);
+    if (thinkingBudget > 0) {
+      generationConfig.thinkingConfig = { thinkingBudget: thinkingBudget };
+      console.debug(`[DHSYSTEM-DEBUG] Model supports thinking. Budget: ${thinkingBudget}, Total MaxTokens: ${generationConfig.maxOutputTokens}`);
     }
 
     console.debug("[DHSYSTEM-DEBUG] API Parameters:", { model: modelName, config: generationConfig });
