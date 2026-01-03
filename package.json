@@ -1,12 +1,11 @@
-
 {
   "name": "e-safepower-learning",
-  "version": "1.0.0",
-  "description": "Nền tảng học tập Nguồn điện an toàn và môi trường",
+  "version": "2.1.0",
+  "description": "Nền tảng học tập Nguồn điện an toàn và môi trường - DHsystem",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder --win --x64"
   },
   "author": "DHsystem",
   "license": "ISC",
@@ -17,17 +16,31 @@
   "build": {
     "appId": "com.dhsystem.esafepower",
     "productName": "E-SafePower",
+    "copyright": "Copyright © 2026 DHsystem",
     "directories": {
       "output": "dist"
     },
     "win": {
-      "icon": "icon.ico",
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "publisherName": "DHsystem"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
-    }
+      "createDesktopShortcut": true,
+      "shortcutName": "E-SafePower Learning"
+    },
+    "files": [
+      "**/*",
+      "!dist/*",
+      "!node_modules/*"
+    ]
   }
 }
