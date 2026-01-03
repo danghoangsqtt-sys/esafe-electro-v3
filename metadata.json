@@ -1,0 +1,8 @@
+{
+  "name": "Copy of E-SafePower Learning System v2 (3/1/26)",
+  "description": "Nền tảng học trực tuyến môn Nguồn điện an toàn và môi trường, tích hợp Gemini 3 Flash cho vấn đáp và biên soạn học liệu chuyên sâu.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

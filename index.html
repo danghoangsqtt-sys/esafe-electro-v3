@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>E-SafePower Learning</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
+    <style>
+      :root {
+        --primary-blue: #2563eb;
+        --bg-soft: #f8fafc;
+      }
+      
+      html { font-size: 14px; }
+      body { 
+        font-family: 'Inter', sans-serif; 
+        background-color: var(--bg-soft);
+        margin: 0; padding: 0;
+      }
+
+      /* Splash Screen Styles */
+      #app-loader {
+        position: fixed; inset: 0;
+        background: #0f172a;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        z-index: 99999;
+        transition: opacity 0.5s ease-out;
+      }
+      .loader-spin {
+        width: 60px; height: 60px;
+        border: 4px solid rgba(37, 99, 235, 0.1);
+        border-top: 4px solid #2563eb;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360px); } }
+
+      #panic-screen {
+        display: none;
+        position: fixed; inset: 0;
+        background: #7f1d1d; color: white;
+        z-index: 100000; padding: 40px;
+        font-family: monospace; overflow: auto;
+      }
+    </style>
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+        "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+        "pdfjs-dist/build/pdf": "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs",
+        "pdfjs-dist/build/pdf.worker": "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs",
+        "pdfjs-dist/": "https://esm.sh/pdfjs-dist@^5.4.530/"
+      }
+    }
+    </script>
+
+    <script>
+      // Hệ thống giám sát khởi động khẩn cấp
+      window.bootLogs = [];
+      function logBoot(msg, type = 'info') {
+        const entry = `[${new Date().toLocaleTimeString()}] [${type.toUpperCase()}] ${msg}`;
+        window.bootLogs.push(entry);
+        console.log(entry);
+      }
+
+      window.onerror = function(message, source, lineno, colno, error) {
+        logBoot(`${message} at ${source}:${lineno}`, 'error');
+        showPanicScreen();
+      };
+
+      window.onunhandledrejection = function(event) {
+        logBoot(`Unhandled Promise Rejection: ${event.reason}`, 'error');
+        showPanicScreen();
+      };
+
+      function showPanicScreen() {
+        const panic = document.getElementById('panic-screen');
+        if (panic) {
+          panic.style.display = 'block';
+          document.getElementById('panic-logs').innerText = window.bootLogs.join('\n');
+        }
+      }
+
+      // Nếu sau 12 giây React chưa render, hiển thị lỗi hệ thống
+      const bootTimeout = setTimeout(() => {
+        logBoot("Quá thời gian khởi động (Timeout 12s). Có thể do lỗi kết nối CDN hoặc file hệ thống.", 'warning');
+        showPanicScreen();
+      }, 12000);
+
+      window.markAppAsReady = () => {
+        clearTimeout(bootTimeout);
+        const loader = document.getElementById('app-loader');
+        if (loader) {
+          loader.style.opacity = '0';
+          setTimeout(() => loader.style.display = 'none', 500);
+        }
+        logBoot("Ứng dụng React đã sẵn sàng.");
+      };
+    </script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <!-- Splash Loader -->
+    <div id="app-loader">
+        <div class="loader-spin mb-6"></div>
+        <div class="flex items-center gap-3 mb-2">
+            <i class="fas fa-shield-bolt text-blue-500 text-2xl"></i>
+            <h2 class="text-white font-black text-xl tracking-tighter">E-SafePower Learning</h2>
+        </div>
+        <p class="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Đang nạp dữ liệu hệ thống...</p>
+    </div>
+
+    <!-- Panic Screen (Hidden by default) -->
+    <div id="panic-screen">
+        <h1 class="text-3xl font-black mb-4 flex items-center gap-4">
+            <i class="fas fa-exclamation-triangle"></i> HỆ THỐNG GẶP LỖI KHỞI ĐỘNG
+        </h1>
+        <p class="mb-8 opacity-80">Ứng dụng không thể tải được các thành phần cần thiết. Vui lòng kiểm tra kết nối Internet hoặc cấu hình hệ thống.</p>
+        
+        <div class="bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
+            <h3 class="text-sm font-bold mb-4 text-yellow-400">NHẬT KÝ HỆ THỐNG (DEBUG LOGS):</h3>
+            <pre id="panic-logs" class="text-xs leading-relaxed"></pre>
+        </div>
+
+        <div class="flex gap-4">
+            <button onclick="window.location.reload()" class="bg-white text-red-900 px-6 py-2 rounded-lg font-bold text-sm uppercase">Thử lại</button>
+            <button onclick="alert('Hãy mở DevTools bằng F12 để kiểm tra Network')" class="bg-transparent border border-white/30 px-6 py-2 rounded-lg font-bold text-sm uppercase">Debug Mode</button>
+        </div>
+    </div>
+
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
