@@ -10,9 +10,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   modelName: 'gemini-3-flash-preview',
   aiVoice: 'Zephyr',
   temperature: 0.7,
-  maxOutputTokens: 1024, // Giảm mặc định để an toàn hơn
+  maxOutputTokens: 1024,
   autoSave: true,
-  ragTopK: 3, // Giảm mặc định để tiết kiệm Context
+  ragTopK: 3,
   thinkingBudget: 0,
   systemExpertise: 'ACADEMIC'
 };
@@ -23,18 +23,27 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
+  // State quản lý API Key
+  const [apiKey, setApiKey] = useState(() => {
+    return localStorage.getItem('gemini_api_key') || '';
+  });
+
   const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
 
   const saveSettings = () => {
+    // Lưu cấu hình ứng dụng
     localStorage.setItem('app_settings', JSON.stringify(settings));
-    onNotify("Đã cập nhật cấu hình hệ thống DHsystem.", "success");
+    // Lưu API Key riêng biệt để bảo mật và dễ quản lý
+    localStorage.setItem('gemini_api_key', apiKey);
+    
+    onNotify("Đã cập nhật cấu hình hệ thống DHsystem thành công.", "success");
   };
 
   const resetToDefault = () => {
-    if (window.confirm("Khôi phục toàn bộ thiết lập về mặc định?")) {
+    if (window.confirm("Khôi phục toàn bộ thiết lập về mặc định? (API Key sẽ không bị xóa)")) {
       setSettings(DEFAULT_SETTINGS);
       onNotify("Đã đặt lại cấu hình gốc.", "info");
     }
@@ -85,7 +94,8 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
         folders: JSON.parse(localStorage.getItem('question_folders') || '[]'),
         docs: JSON.parse(localStorage.getItem('elearning_docs') || '[]'),
         knowledgeBase: JSON.parse(localStorage.getItem('knowledge_base') || '[]'),
-        settings: JSON.parse(localStorage.getItem('app_settings') || 'null'),
+        settings: settings,
+        apiKey: apiKey,
         gameScores: JSON.parse(localStorage.getItem('game_scores') || '[]'),
         userInfo: JSON.parse(localStorage.getItem('last_user_info') || 'null'),
         exportDate: new Date().toISOString(),
@@ -117,12 +127,13 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
           throw new Error("Tệp sao lưu không đúng định dạng của E-SafePower.");
         }
 
-        if (window.confirm("CẢNH BÁO: Toàn bộ dữ liệu hiện tại trên thiết bị này sẽ bị thay thế bởi dữ liệu từ bản sao lưu.")) {
+        if (window.confirm("CẢNH BÁO: Toàn bộ dữ liệu hiện tại sẽ bị thay thế bởi dữ liệu từ bản sao lưu.")) {
           if (data.questions) localStorage.setItem('questions', JSON.stringify(data.questions));
           if (data.folders) localStorage.setItem('question_folders', JSON.stringify(data.folders));
           if (data.docs) localStorage.setItem('elearning_docs', JSON.stringify(data.docs));
           if (data.knowledgeBase) localStorage.setItem('knowledge_base', JSON.stringify(data.knowledgeBase));
           if (data.settings) localStorage.setItem('app_settings', JSON.stringify(data.settings));
+          if (data.apiKey) localStorage.setItem('gemini_api_key', data.apiKey);
           if (data.gameScores) localStorage.setItem('game_scores', JSON.stringify(data.gameScores));
           if (data.userInfo) localStorage.setItem('last_user_info', JSON.stringify(data.userInfo));
 
@@ -159,6 +170,36 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 space-y-6">
+          {/* PHẦN MỚI: Cấu hình API Key */}
+          <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl border border-blue-100/50 shadow-inner">
+                <i className="fas fa-key"></i>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 tracking-tight">Kích hoạt Gemini AI</h3>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Yêu cầu khóa từ Google AI Studio</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="relative">
+                <input 
+                  type="password" 
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="Dán API Key của bạn tại đây..."
+                  className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                   <i className={`fas ${apiKey ? 'fa-check-circle text-green-500' : 'fa-circle-exclamation text-amber-500'}`}></i>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 italic px-2">
+                * Khóa API được lưu cục bộ trên trình duyệt này và không gửi về máy chủ trung gian.
+              </p>
+            </div>
+          </section>
+
           <section className="bg-slate-900 rounded-[2.5rem] border border-white/5 shadow-2xl p-8 text-white relative overflow-hidden">
              <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
              <div className="flex items-center justify-between mb-8 relative z-10">
@@ -211,29 +252,6 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                </div>
              )}
           </section>
-
-          <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center text-xl border border-orange-100/50 shadow-inner">
-                <i className="fas fa-database"></i>
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-800 tracking-tight">Sao lưu Dữ liệu</h3>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Xuất/Nhập ngân hàng đề & tài liệu</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={handleExportBackup} className="flex flex-col items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-orange-50 transition">
-                <i className="fas fa-file-export text-orange-600 mb-2"></i>
-                <span className="text-[10px] font-black uppercase tracking-widest">Xuất Backup</span>
-              </button>
-              <label className="flex flex-col items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-blue-50 transition cursor-pointer">
-                <i className="fas fa-file-import text-blue-600 mb-2"></i>
-                <span className="text-[10px] font-black uppercase tracking-widest">Khôi phục</span>
-                <input type="file" className="hidden" accept=".json" onChange={handleImportBackup} />
-              </label>
-            </div>
-          </section>
         </div>
 
         <div className="lg:col-span-5 space-y-6">
@@ -269,6 +287,28 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                 </div>
                 <input type="range" min="1" max="10" step="1" value={settings.ragTopK} onChange={e => setSettings({...settings, ragTopK: parseInt(e.target.value)})} className="w-full h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer accent-purple-600" />
               </div>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center text-xl border border-orange-100/50 shadow-inner">
+                <i className="fas fa-database"></i>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800 tracking-tight">Quản lý Dữ liệu</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={handleExportBackup} className="flex flex-col items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-orange-50 transition">
+                <i className="fas fa-file-export text-orange-600 mb-2"></i>
+                <span className="text-[10px] font-black uppercase tracking-widest">Xuất Backup</span>
+              </button>
+              <label className="flex flex-col items-center p-4 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-blue-50 transition cursor-pointer">
+                <i className="fas fa-file-import text-blue-600 mb-2"></i>
+                <span className="text-[10px] font-black uppercase tracking-widest">Khôi phục</span>
+                <input type="file" className="hidden" accept=".json" onChange={handleImportBackup} />
+              </label>
             </div>
           </section>
         </div>

@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType, VectorChunk, AppSettings } from "../types";
 import { findRelevantChunks } from "./documentProcessor";
@@ -21,15 +19,23 @@ const getSettings = (): AppSettings => {
 };
 
 const getAI = () => {
-  /* Enforce exclusively using process.env.API_KEY per guidelines */
-  return new GoogleGenAI({ apiKey: process.env.API_KEY! });
+  // Ưu tiên lấy API Key từ localStorage (được nhập từ màn hình Settings)
+  // Nếu không có mới sử dụng biến môi trường process.env.API_KEY
+  const savedKey = localStorage.getItem('gemini_api_key');
+  const apiKey = savedKey || process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("API Key chưa được cấu hình. Vui lòng kiểm tra trong phần Cài đặt.");
+  }
+  
+  return new GoogleGenAI({ apiKey });
 };
 
 const getSystemInstruction = (settings: AppSettings, contextText: string) => {
   let instruction = `Bạn là Trợ lý Giáo sư chuyên ngành Nguồn điện An toàn và Môi trường (Hệ thống E-SafePower - DHsystem).
 NHIỆM VỤ: Giải đáp thắc mắc về kỹ thuật điện, tiêu chuẩn an toàn (IEC, TCVN), ắc quy, nguồn năng lượng tái tạo và xử lý chất thải điện tử.
 PHONG CÁCH: Hàn lâm, chính xác, sử dụng thuật ngữ chuyên môn.
-ĐỊNH DẠNG: Sử dụng Markdown cho danh sách và LaTeX ($...$) cho các công thức điện học (Vd: $P = U.I.cos\phi$).
+ĐỊNH DẠNG: Sử dụng Markdown cho danh sách và LaTeX ($...$) cho các công thức điện học (Vd: $P = U.I.cos\\phi$).
 TRÁNH: Trả lời lan man hoặc thiếu căn cứ kỹ thuật.`;
 
   if (contextText) {
@@ -50,7 +56,6 @@ export const generateChatResponse = async (
     let contextText = "";
     let ragSources: { uri: string; title: string }[] = [];
     
-    // Tìm kiếm tri thức liên quan từ RAG
     if (knowledgeBase.length > 0 && message.length > 5) {
       try {
         const relevantChunks = await findRelevantChunks(message, knowledgeBase, settings.ragTopK);
@@ -66,7 +71,6 @@ export const generateChatResponse = async (
     const modelName = config?.model || settings.modelName; 
     const systemInstruction = getSystemInstruction(settings, contextText);
 
-    /* Incorporate thinkingConfig when maxOutputTokens is set to satisfy API guidelines */
     const response = await ai.models.generateContent({
       model: modelName,
       contents: [
@@ -116,9 +120,10 @@ export const generateQuestionsByAI = async (
       },
     };
 
+    // SỬA LỖI: Chuyển cấu trúc contents thành mảng đối tượng đúng chuẩn SDK
     const response = await ai.models.generateContent({
       model: settings.modelName,
-      contents: promptText,
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
@@ -127,6 +132,7 @@ export const generateQuestionsByAI = async (
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
+    console.error("AI Generation Error:", error);
     throw error;
   }
 };
@@ -139,14 +145,15 @@ export const evaluateOralAnswer = async (
     try {
       const ai = getAI();
       const settings = getSettings();
+      // SỬA LỖI: Chuyển cấu trúc contents cho hàm đánh giá vấn đáp
       const response = await ai.models.generateContent({
           model: settings.modelName,
-          contents: `Đánh giá câu trả lời của sinh viên.
-Câu hỏi: ${question}
-Đáp án chuẩn: ${correctAnswerOrContext}
-Câu trả lời của sinh viên: ${userAnswer}
-
-Hãy cho điểm từ 0-10 và nhận xét ngắn gọn.`,
+          contents: [{ 
+            role: 'user', 
+            parts: [{ 
+              text: `Đánh giá câu trả lời của sinh viên.\nCâu hỏi: ${question}\nĐáp án chuẩn: ${correctAnswerOrContext}\nCâu trả lời của sinh viên: ${userAnswer}\n\nHãy cho điểm từ 0-10 và nhận xét ngắn gọn.` 
+            }] 
+          }],
           config: { 
               responseMimeType: "application/json", 
               temperature: 0.3,
