@@ -1,3 +1,4 @@
+
 const { app, BrowserWindow, session, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -19,7 +20,7 @@ function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    show: false, // Không hiển thị ngay để tránh nháy trắng
+    show: false,
     backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: false,
@@ -40,6 +41,13 @@ function createWindow() {
     callback(false);
   });
 
+  // Handler cho việc khởi động lại sau update
+  ipcMain.on('relaunch-app', () => {
+    logToFile("Relaunching app for update...");
+    app.relaunch();
+    app.exit();
+  });
+
   const indexPath = path.join(__dirname, 'index.html');
   logToFile(`Loading file: ${indexPath}`);
 
@@ -47,13 +55,11 @@ function createWindow() {
     logToFile(`ERROR loading file: ${err.message}`);
   });
 
-  // Chỉ hiển thị cửa sổ khi đã nạp xong khung html
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     logToFile("Window shown to user.");
   });
 
-  // Phím tắt mở DevTools để debug nhanh khi bị màn trắng
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12') {
       mainWindow.webContents.openDevTools();
@@ -61,7 +67,6 @@ function createWindow() {
     }
   });
 
-  // Theo dõi lỗi nạp tài nguyên
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
     logToFile(`FAILED LOAD: ${errorCode} - ${errorDescription}`);
   });

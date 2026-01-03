@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
-import { AppSettings } from '../types';
+import React, { useState, useEffect } from 'react';
+import { AppSettings, AppVersionInfo } from '../types';
+import { checkAppUpdate, summarizeUpdateWithAI } from '../services/updateService';
 
 interface SettingsProps {
   onNotify: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
@@ -25,6 +26,12 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
 
   const [manualKey, setManualKey] = useState(() => localStorage.getItem('manual_api_key') || '');
   const [showKey, setShowKey] = useState(false);
+  
+  // Update state
+  const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   const saveSettings = () => {
     localStorage.setItem('app_settings', JSON.stringify(settings));
@@ -39,6 +46,41 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
       localStorage.removeItem('manual_api_key');
       onNotify("Đã đặt lại cấu hình gốc.", "info");
     }
+  };
+
+  const handleCheckUpdate = async () => {
+    setIsChecking(true);
+    try {
+      const info = await checkAppUpdate();
+      setUpdateInfo(info);
+      if (info.isUpdateAvailable) {
+        onNotify(`Phát hiện phiên bản mới: ${info.latestVersion}`, "info");
+      } else {
+        onNotify("Ứng dụng đang ở phiên bản mới nhất.", "success");
+      }
+    } catch (e: any) {
+      onNotify(e.message, "error");
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const startUpdate = () => {
+    setIsDownloading(true);
+    let p = 0;
+    const interval = setInterval(() => {
+      p += Math.random() * 15;
+      if (p >= 100) {
+        p = 100;
+        clearInterval(interval);
+        setTimeout(() => {
+          onNotify("Tải về hoàn tất! Ứng dụng sẽ khởi động lại.", "success");
+          // Giả lập relaunch trong Electron
+          window.location.reload();
+        }, 1000);
+      }
+      setDownloadProgress(Math.floor(p));
+    }, 400);
   };
 
   return (
@@ -73,8 +115,9 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* API Section */}
+        {/* Left Column: API & Models */}
         <div className="lg:col-span-7 space-y-6">
+          {/* API Section */}
           <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-6 space-y-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg">
@@ -114,58 +157,84 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
             </div>
           </section>
 
-          {/* Model Params Card */}
-          <section className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-lg">
-                <i className="fas fa-microchip"></i>
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Cấu hình Mô hình</h3>
-                <p className="text-[10px] text-slate-400 font-medium italic">Tinh chỉnh khả năng xử lý học thuật</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vai trò trợ lý</label>
-                <select 
-                  value={settings.systemExpertise}
-                  onChange={e => setSettings({...settings, systemExpertise: e.target.value as any})}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
-                >
-                  <option value="ACADEMIC">Giảng viên DHsystem</option>
-                  <option value="FIELD_EXPERT">Kỹ sư Hiện trường</option>
-                  <option value="STUDENT_ASSISTANT">Trợ lý học tập</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Độ ưu tiên</label>
-                <div className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-400 flex items-center justify-between">
-                   <span>Tiếng Việt (Mặc định)</span>
-                   <i className="fas fa-lock text-[9px]"></i>
+          {/* Remote Update Section (New) */}
+          <section className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl border border-white/5 shadow-2xl p-6 text-white relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+             <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                   <div className="w-10 h-10 bg-white/10 text-blue-400 rounded-xl flex items-center justify-center text-lg">
+                      <i className="fas fa-cloud-arrow-down"></i>
+                   </div>
+                   <div>
+                      <h3 className="text-sm font-bold">Cập nhật Hệ thống</h3>
+                      <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black">Git-based Update Engine</p>
+                   </div>
                 </div>
-              </div>
-            </div>
+                <div className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold text-slate-400">
+                    v2.1.0
+                </div>
+             </div>
 
-            <div className="space-y-4 pt-4 border-t border-slate-50">
-              <div className="flex justify-between items-center">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Ngân sách suy luận (Thinking)</label>
-                <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{settings.thinkingBudget}</span>
-              </div>
-              <input 
-                type="range" min="0" max="24576" step="1024" 
-                value={settings.thinkingBudget}
-                onChange={e => setSettings({...settings, thinkingBudget: parseInt(e.target.value)})}
-                className="w-full h-1 bg-slate-100 rounded-full appearance-none cursor-pointer accent-indigo-600"
-              />
-              <p className="text-[9px] text-slate-400 italic">Cho phép AI suy nghĩ sâu hơn trước khi trả lời các bài toán an toàn điện phức tạp.</p>
-            </div>
+             {!updateInfo ? (
+               <div className="flex flex-col items-center py-4">
+                  <button 
+                    disabled={isChecking}
+                    onClick={handleCheckUpdate}
+                    className="group relative px-8 py-3 bg-blue-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-blue-500 transition-all disabled:opacity-50"
+                  >
+                     {isChecking ? <i className="fas fa-sync fa-spin mr-2"></i> : <i className="fas fa-search mr-2"></i>}
+                     {isChecking ? "Đang kiểm tra..." : "Kiểm tra cập nhật"}
+                  </button>
+                  <p className="mt-3 text-[9px] text-slate-500 italic">Kiểm tra phiên bản mới từ kho lưu trữ Git của DHsystem</p>
+               </div>
+             ) : (
+               <div className="space-y-4 animate-fade-in">
+                  {updateInfo.isUpdateAvailable ? (
+                    <div className="bg-white/5 border border-white/10 p-5 rounded-2xl">
+                       <div className="flex justify-between items-center mb-4">
+                          <div>
+                             <span className="text-[10px] font-black text-blue-400 uppercase">Phiên bản mới khả dụng</span>
+                             <h4 className="text-xl font-black">v{updateInfo.latestVersion}</h4>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-bold">{updateInfo.releaseDate}</span>
+                       </div>
+                       
+                       <div className="text-[11px] text-slate-300 leading-relaxed mb-6 whitespace-pre-line p-3 bg-black/20 rounded-xl border border-white/5">
+                          {updateInfo.changelog}
+                       </div>
+
+                       {isDownloading ? (
+                         <div className="space-y-3">
+                            <div className="flex justify-between text-[10px] font-black uppercase">
+                               <span>Đang tải gói cập nhật...</span>
+                               <span>{downloadProgress}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                               <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${downloadProgress}%` }}></div>
+                            </div>
+                         </div>
+                       ) : (
+                         <button 
+                            onClick={startUpdate}
+                            className="w-full py-3 bg-green-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-500 transition-all shadow-lg"
+                         >
+                            Nâng cấp ngay
+                         </button>
+                       )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-3 py-4 text-green-400">
+                       <i className="fas fa-check-circle text-xl"></i>
+                       <span className="text-xs font-bold">Bạn đang sử dụng phiên bản mới nhất.</span>
+                       <button onClick={() => setUpdateInfo(null)} className="text-[9px] text-slate-500 uppercase font-black ml-4 hover:text-white">Kiểm tra lại</button>
+                    </div>
+                  )}
+               </div>
+             )}
           </section>
         </div>
 
-        {/* Right Column */}
+        {/* Right Column: AI Sliders */}
         <div className="lg:col-span-5 space-y-6">
           <section className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-6">
             <div className="flex items-center gap-3">

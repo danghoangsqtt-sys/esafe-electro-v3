@@ -75,5 +75,14 @@ export interface AppSettings {
   ragTopK: number;
   thinkingBudget: number; 
   systemExpertise: 'ACADEMIC' | 'FIELD_EXPERT' | 'STUDENT_ASSISTANT';
-  debugMode?: boolean; // New: Chế độ nhà phát triển
+  debugMode?: boolean;
+}
+
+export interface AppVersionInfo {
+  currentVersion: string;
+  latestVersion: string;
+  releaseDate: string;
+  changelog: string;
+  updateUrl: string;
+  isUpdateAvailable: boolean;
 }
