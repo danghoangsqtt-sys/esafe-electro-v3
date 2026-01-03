@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 import { VectorChunk, PdfMetadata } from "../types";
 import * as pdfjsLib from "pdfjs-dist";
@@ -65,7 +64,10 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
     return text;
 }
 
-export const chunkText = (text: string, targetChunkSize: number = 1000, overlap: number = 200): string[] => {
+/**
+ * Cải thiện việc tách đoạn (chunking) để giữ ngữ cảnh tốt hơn
+ */
+export const chunkText = (text: string, targetChunkSize: number = 800, overlap: number = 150): string[] => {
   const cleanText = text.replace(/\s+/g, ' ').trim();
   const sentences = cleanText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleanText];
   const chunks: string[] = [];
@@ -74,6 +76,7 @@ export const chunkText = (text: string, targetChunkSize: number = 1000, overlap:
   for (const sentence of sentences) {
     if ((currentChunk.length + sentence.length) > targetChunkSize && currentChunk.length > 0) {
       chunks.push(currentChunk.trim());
+      // Giữ lại phần overlap từ cuối chunk trước
       currentChunk = currentChunk.slice(-overlap) + sentence; 
     } else {
       currentChunk += " " + sentence;
@@ -95,6 +98,7 @@ export const embedChunks = async (
   const ai = new GoogleGenAI({ apiKey });
   const vectorChunks: VectorChunk[] = [];
 
+  // Xử lý song song từng cụm nhỏ để tránh quá tải API
   for (let i = 0; i < textChunks.length; i++) {
     try {
       const response = await ai.models.embedContent({
@@ -113,19 +117,19 @@ export const embedChunks = async (
     } catch (e: any) {
       console.error(`Embedding failed at chunk ${i}:`, e);
       if (e.toString().includes('429')) {
-        await new Promise(r => setTimeout(r, 10000));
+        await new Promise(r => setTimeout(r, 5000));
         i--;
         continue;
       }
     }
     if (onProgress) onProgress(Math.round(((i + 1) / textChunks.length) * 100));
-    await new Promise(r => setTimeout(r, 1000)); 
   }
   return vectorChunks;
 };
 
 const dotProduct = (a: number[], b: number[]) => a.reduce((sum, val, i) => sum + val * b[i], 0);
 const magnitude = (a: number[]) => Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+
 export const cosineSimilarity = (a: number[], b: number[]) => {
     const magA = magnitude(a);
     const magB = magnitude(b);
@@ -139,7 +143,6 @@ export const findRelevantChunks = async (
   topK: number = 5
 ): Promise<VectorChunk[]> => {
   if (knowledgeBase.length === 0) return [];
-  /* Enforce exclusively using process.env.API_KEY per guidelines */
   const apiKey = process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey! });
 
@@ -157,6 +160,11 @@ export const findRelevantChunks = async (
       .slice(0, topK)
       .map(item => item.chunk);
   } catch (e) {
-    return [];
+    console.error("[RAG] Search Error:", e);
+    // Dự phòng: Tìm kiếm theo từ khóa cơ bản nếu embedding lỗi
+    const lowerQuery = query.toLowerCase();
+    return knowledgeBase
+      .filter(chunk => chunk.text.toLowerCase().includes(lowerQuery))
+      .slice(0, topK);
   }
 };

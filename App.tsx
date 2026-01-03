@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Chatbot from './components/Chatbot';
 import QuestionGenerator from './components/QuestionGenerator';
@@ -54,7 +54,7 @@ const Dashboard = ({ questions, knowledgeBase }: any) => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 <StatCard icon="fa-bolt-lightning" color="blue" label="Câu hỏi an toàn" value={questions.length} />
-                <StatCard icon="fa-brain-circuit" color="purple" label="Tri thức AI" value={knowledgeBase.length} />
+                <StatCard icon="fa-brain-circuit" color="purple" label="Phân đoạn tri thức" value={knowledgeBase.length} />
                 <StatCard icon="fa-book-bookmark" color="orange" label="Bài học" value={JSON.parse(localStorage.getItem('question_folders') || '[]').length} />
                 <StatCard icon="fa-leaf" color="green" label="Tài liệu môi trường" value={JSON.parse(localStorage.getItem('elearning_docs') || '[]').length} />
             </div>
@@ -131,6 +131,14 @@ const App: React.FC = () => {
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 4000);
   };
 
+  const deleteKnowledgeByDocId = useCallback((docId: string) => {
+    setKnowledgeBase(prev => prev.filter(chunk => chunk.docId !== docId));
+  }, []);
+
+  const updateKnowledgeBase = useCallback((newChunks: VectorChunk[]) => {
+    setKnowledgeBase(prev => [...prev, ...newChunks]);
+  }, []);
+
   return (
     <Router>
       <div className="flex h-screen bg-slate-50 font-sans overflow-hidden relative">
@@ -191,7 +199,7 @@ const App: React.FC = () => {
               <div className="flex-1 overflow-auto custom-scrollbar">
                   <Routes>
                       <Route path="/" element={<Dashboard questions={questions} knowledgeBase={knowledgeBase} />} />
-                      <Route path="/documents" element={<Documents onUpdateKnowledgeBase={(c)=>setKnowledgeBase(p=>[...p,...c])} onNotify={showNotify} />} />
+                      <Route path="/documents" element={<Documents onUpdateKnowledgeBase={updateKnowledgeBase} onDeleteDocumentData={deleteKnowledgeByDocId} onNotify={showNotify} />} />
                       <Route path="/generate" element={<QuestionGenerator folders={folders} onSaveQuestions={(q)=>setQuestions(p=>[...p,...q])} onNotify={showNotify}/>} />
                       <Route path="/bank" element={<QuestionBankManager questions={questions} setQuestions={setQuestions} folders={folders} setFolders={setFolders} showNotify={showNotify} />} />
                       <Route path="/game" element={<GameQuiz questions={questions} folders={folders} />} />

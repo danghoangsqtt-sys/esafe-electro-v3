@@ -1,3 +1,6 @@
+
+// Fix: Exclusively use process.env.API_KEY per guidelines (line 22)
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType, VectorChunk, AppSettings } from "../types";
 import { findRelevantChunks } from "./documentProcessor";
@@ -19,13 +22,11 @@ const getSettings = (): AppSettings => {
 };
 
 const getAI = () => {
-  // Ưu tiên lấy API Key từ localStorage (được nhập từ màn hình Settings)
-  // Nếu không có mới sử dụng biến môi trường process.env.API_KEY
-  const savedKey = localStorage.getItem('gemini_api_key');
-  const apiKey = savedKey || process.env.API_KEY;
+  // Fix: Exclusively use process.env.API_KEY per guidelines
+  const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
-    throw new Error("API Key chưa được cấu hình. Vui lòng kiểm tra trong phần Cài đặt.");
+    throw new Error("API Key chưa được cấu hình. Vui lòng kiểm tra biến môi trường API_KEY.");
   }
   
   return new GoogleGenAI({ apiKey });
@@ -120,7 +121,6 @@ export const generateQuestionsByAI = async (
       },
     };
 
-    // SỬA LỖI: Chuyển cấu trúc contents thành mảng đối tượng đúng chuẩn SDK
     const response = await ai.models.generateContent({
       model: settings.modelName,
       contents: [{ role: 'user', parts: [{ text: promptText }] }],
@@ -145,7 +145,6 @@ export const evaluateOralAnswer = async (
     try {
       const ai = getAI();
       const settings = getSettings();
-      // SỬA LỖI: Chuyển cấu trúc contents cho hàm đánh giá vấn đáp
       const response = await ai.models.generateContent({
           model: settings.modelName,
           contents: [{ 
