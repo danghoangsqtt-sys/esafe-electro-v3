@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Chatbot from './components/Chatbot';
@@ -7,24 +8,8 @@ import GameQuiz from './components/GameQuiz';
 import UserGuide from './components/UserGuide';
 import Settings from './components/Settings';
 import QuestionBankManager from './components/QuestionBankManager';
+import ChangelogModal from './components/ChangelogModal';
 import { Question, VectorChunk, QuestionFolder } from './types';
-
-// Hướng dẫn kỹ thuật mặc định (có thể tách file sau)
-const TECHNICAL_GUIDES = [
-  {
-    title: "Đo điện trở tiếp đất",
-    icon: "fa-arrows-down-to-line",
-    color: "blue",
-    steps: [
-      "Chuẩn bị máy đo điện trở đất chuyên dụng (Earth Tester).",
-      "Cắm 2 cọc phụ: Cọc dòng (C) cách 20m và Cọc áp (P) cách cọc chính 10m.",
-      "Nối dây từ các cọc C, P và hệ thống tiếp đất cần đo (E) vào máy.",
-      "Kiểm tra điện áp đất (không được quá 10V) trước khi đo.",
-      "Xoay núm đo và đọc kết quả (Tiêu chuẩn an toàn thường < 4Ω)."
-    ],
-    note: "Nên đo vào mùa khô để có kết quả chính xác nhất về khả năng tản dòng."
-  }
-];
 
 const SidebarLink = ({ to, icon, label }: { to: string, icon: string, label: string }) => {
   const location = useLocation();
@@ -44,7 +29,6 @@ const SidebarLink = ({ to, icon, label }: { to: string, icon: string, label: str
   );
 };
 
-// --- Dashboard Component ---
 const Dashboard = ({ questions, knowledgeBase }: any) => {
     return (
         <div className="p-6 md:p-8 space-y-8 animate-fade-in main-container">
@@ -86,7 +70,6 @@ const StatCard = ({ icon, color, label, value }: any) => (
     </div>
 );
 
-// --- Debug Console Component ---
 const DebugConsole = ({ show, onClose }: { show: boolean, onClose: () => void }) => {
     if (!show) return null;
     return (
@@ -120,7 +103,6 @@ const App: React.FC = () => {
     localStorage.setItem('knowledge_base', JSON.stringify(knowledgeBase));
   }, [questions, folders, knowledgeBase]);
 
-  // Phím tắt để mở Debug Console (Ctrl+Shift+D)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.ctrlKey && e.shiftKey && e.key === 'D') {
@@ -141,8 +123,8 @@ const App: React.FC = () => {
     <Router>
       <div className="flex h-screen bg-slate-50 font-sans overflow-hidden relative">
         <DebugConsole show={showDebug} onClose={() => setShowDebug(false)} />
+        <ChangelogModal />
         
-        {/* Toast Container */}
         <div className="fixed top-6 right-6 z-[100] space-y-3 pointer-events-none">
             {notifications.map(n => (
                 <div key={n.id} className={`px-5 py-3.5 rounded-2xl shadow-xl border flex items-center gap-4 animate-fade-in-up pointer-events-auto bg-white min-w-[300px] border-${n.type === 'success' ? 'green' : n.type === 'error' ? 'red' : 'blue'}-100`}>

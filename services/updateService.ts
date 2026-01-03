@@ -1,26 +1,32 @@
-
 import { AppVersionInfo } from "../types";
 import { GoogleGenAI } from "@google/genai";
 
+// Số phiên bản này phải khớp với file version.json cục bộ
 const CURRENT_VERSION = "2.1.0";
-// URL giả định trỏ tới file version.json trên một Git repository (VD: GitHub raw)
-const REMOTE_VERSION_URL = "https://raw.githubusercontent.com/dhsystem/esafepower-updates/main/version.json";
+
+// Lưu ý: Thay đổi URL này thành URL raw trên GitHub của bạn sau khi push code
+const REMOTE_VERSION_URL = "https://raw.githubusercontent.com/danghoangsqtt-sys/esafe-electro-v3/main/version.json";
 
 export const checkAppUpdate = async (): Promise<AppVersionInfo> => {
   console.debug("[DHSYSTEM-UPDATE] Checking for updates...");
   
   try {
-    // Trong môi trường thực tế, fetch dữ liệu từ Git URL
-    // Ở đây ta giả lập một phản hồi từ server
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Trong thực tế, bạn sẽ fetch từ REMOTE_VERSION_URL
+    // Ở đây giả lập việc gọi API để bạn có thể test giao diện ngay
+    const response = await fetch(REMOTE_VERSION_URL).catch(() => null);
     
-    // Giả định server trả về phiên bản 2.2.0
-    const serverData = {
-      version: "2.2.0",
-      releaseDate: "2026-06-01",
-      changelog: "1. Nâng cấp engine Gemini 2.5 cho tốc độ phản hồi nhanh gấp 2 lần. \n2. Bổ sung tính năng kéo thả tài liệu trực tiếp. \n3. Sửa lỗi hiển thị công thức LaTeX trong Millionaire Game. \n4. Tối ưu hóa bộ nhớ khi xử lý file PDF lớn.",
-      updateUrl: "https://github.com/dhsystem/esafepower-updates/releases/latest"
-    };
+    let serverData;
+    if (response && response.ok) {
+        serverData = await response.json();
+    } else {
+        // Dữ liệu giả lập nếu chưa có server thật để bạn thấy được logic
+        serverData = {
+            version: "2.2.0", 
+            releaseDate: "2026-06-01",
+            changelog: "1. Nâng cấp engine Gemini 3 Pro.\n2. Tối ưu hóa tốc độ tải PDF.\n3. Thêm tính năng xuất báo cáo học tập.",
+            updateUrl: "https://github.com/danghoangsqtt-sys/esafe-electro-v3/releases/latest"
+        };
+    }
 
     const isAvailable = compareVersions(CURRENT_VERSION, serverData.version) < 0;
 
@@ -56,7 +62,7 @@ export const summarizeUpdateWithAI = async (changelog: string): Promise<string> 
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Hãy tóm tắt các điểm mới sau đây một cách ngắn gọn, thu hút và chuyên nghiệp cho người dùng ứng dụng E-SafePower: \n\n${changelog}`,
+      contents: `Hãy tóm tắt các điểm mới sau đây một cách ngắn gọn và chuyên nghiệp: \n\n${changelog}`,
       config: { temperature: 0.5 }
     });
     return response.text || changelog;
