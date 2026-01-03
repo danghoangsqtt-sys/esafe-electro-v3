@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { generateQuestionsByAI } from '../services/geminiService';
 import { Question, QuestionType, QuestionFolder } from '../types';
@@ -77,8 +76,15 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
     return QuestionType.ESSAY;
   };
 
+  // Helper function to get API Key - FIXED BUG HERE
+  const getEffectiveApiKey = () => {
+    return localStorage.getItem('manual_api_key') || process.env.API_KEY;
+  };
+
   const handleAiGenerate = async () => {
-    if (!process.env.API_KEY) return onNotify("Vui lòng kích hoạt AI trong phần Cài đặt.", "error");
+    const apiKey = getEffectiveApiKey(); // Đã sửa: Kiểm tra cả localStorage
+    if (!apiKey) return onNotify("Vui lòng kích hoạt AI trong phần Cài đặt.", "error");
+    
     if (totalQuestions === 0) return onNotify("Hãy chọn ít nhất 1 mức độ Bloom", "warning");
     if (!pdfFile) return onNotify("Hãy tải lên tệp tài liệu nguồn", "warning");
 
@@ -158,10 +164,12 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
   };
 
   const handleAiFileAnalysis = async (file: File) => {
-    if (!process.env.API_KEY) return onNotify("Vui lòng kích hoạt AI trong phần Cài đặt.", "error");
+    const apiKey = getEffectiveApiKey(); // Đã sửa: Kiểm tra cả localStorage
+    if (!apiKey) return onNotify("Vui lòng kích hoạt AI trong phần Cài đặt.", "error");
+    
     setIsLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: apiKey }); // Đã sửa: Sử dụng apiKey từ hàm helper
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [
@@ -422,7 +430,6 @@ Dây tiếp địa giúp dẫn dòng điện rò rỉ xuống đất, bảo vệ
                       {manualQ.options.map((opt, i) => (
                         <div key={i} className="flex gap-2">
                           <input type="text" value={opt} onChange={e => { const n = [...manualQ.options]; n[i] = e.target.value; setManualQ({...manualQ, options: n}); }} placeholder={`Phương án ${String.fromCharCode(65+i)}`} className="flex-1 p-3 rounded-xl border border-gray-200 outline-none focus:border-blue-500 transition-all" />
-                          {/* Fix: removed undefined manualKey from condition */}
                           <button onClick={() => setManualQ({...manualQ, correctAnswer: opt})} className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${manualQ.correctAnswer === opt && opt !== '' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-white text-gray-300 border-2 border-gray-100'}`}><i className="fas fa-check text-xs"></i></button>
                         </div>
                       ))}
