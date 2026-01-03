@@ -99,6 +99,7 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
         settings: JSON.parse(localStorage.getItem('app_settings') || 'null'),
         apiKey: localStorage.getItem('manual_api_key') || '',
         gameScores: JSON.parse(localStorage.getItem('game_scores') || '[]'),
+        userInfo: JSON.parse(localStorage.getItem('last_user_info') || 'null'),
         exportDate: new Date().toISOString(),
         system: "E-SafePower Learning"
       };
@@ -138,6 +139,7 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
           if (data.settings) localStorage.setItem('app_settings', JSON.stringify(data.settings));
           if (data.apiKey !== undefined) localStorage.setItem('manual_api_key', data.apiKey);
           if (data.gameScores) localStorage.setItem('game_scores', JSON.stringify(data.gameScores));
+          if (data.userInfo) localStorage.setItem('last_user_info', JSON.stringify(data.userInfo));
 
           onNotify("Khôi phục thành công! Ứng dụng sẽ tự động tải lại sau 2 giây.", "success");
           setTimeout(() => window.location.reload(), 2000);

@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win --x64"
+    "build": "vite build && electron-builder --win --x64"
   },
   "author": "DHsystem",
   "license": "ISC",
@@ -29,7 +29,7 @@
     "productName": "E-SafePower",
     "copyright": "Copyright © 2026 DHsystem",
     "directories": {
-      "output": "dist"
+      "output": "dist-electron"
     },
     "win": {
       "icon": "build/icon.ico",
@@ -50,9 +50,13 @@
       "shortcutName": "E-SafePower Learning"
     },
     "files": [
-      "**/*",
-      "!dist/*",
-      "!node_modules/*"
+      "dist/**/*",
+      "main.js",
+      "package.json",
+      "version.json"
+    ],
+    "extraResources": [
+      "build/icon.ico"
     ]
   }
 }

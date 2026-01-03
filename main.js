@@ -21,17 +21,16 @@ function createWindow() {
     width: 1280,
     height: 800,
     show: false,
-    icon: path.join(__dirname, 'icon.ico'),
     backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false,
+      webSecurity: false, 
       devTools: true
     }
   });
 
-  // Tự động cấp quyền Media
+  // Tự động cấp quyền Media cho Vấn đáp AI
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
     if (permission === 'media') return true;
     return false;
@@ -42,41 +41,44 @@ function createWindow() {
     callback(false);
   });
 
-  // Handler cho việc khởi động lại sau update
-  ipcMain.on('relaunch-app', () => {
-    logToFile("Relaunching app for update...");
-    app.relaunch();
-    app.exit();
+  // Xử lý sự cố nạp tệp
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    logToFile(`FAILED TO LOAD CONTENT: ${errorCode} - ${errorDescription}`);
   });
 
-  const indexPath = path.join(__dirname, 'index.html');
-  logToFile(`Loading file: ${indexPath}`);
-
+  // --- QUAN TRỌNG: CHỈNH SỬA ĐƯỜNG DẪN NẠP FILE ---
+  // Kiểm tra nếu app đã đóng gói (Packaged) thì nạp từ thư mục dist
+  const isPackaged = app.isPackaged;
+  const indexPath = isPackaged 
+    ? path.join(__dirname, 'dist', 'index.html') 
+    : path.join(__dirname, 'index.html');
+    
+  logToFile(`Loading interface from: ${indexPath} (Packaged: ${isPackaged})`);
+  
   mainWindow.loadFile(indexPath).catch(err => {
-    logToFile(`ERROR loading file: ${err.message}`);
+    logToFile(`CRITICAL ERROR: Could not load index.html at ${indexPath}. ${err.message}`);
   });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    logToFile("Window shown to user.");
+    logToFile("Application Window is now visible.");
   });
 
+  // Phím tắt Debug
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12') {
       mainWindow.webContents.openDevTools();
-      logToFile("DevTools opened by user shortcut (F12)");
+      logToFile("DevTools toggled by user (F12)");
     }
-  });
-
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    logToFile(`FAILED LOAD: ${errorCode} - ${errorDescription}`);
   });
 
   mainWindow.setMenuBarVisibility(false);
 }
 
+app.commandLine.appendSwitch('ignore-certificate-errors');
+
 app.whenReady().then(() => {
-  logToFile("App Ready.");
+  logToFile("System Kernel Ready.");
   createWindow();
 
   app.on('activate', function () {
@@ -85,6 +87,6 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', function () {
-  logToFile("All windows closed.");
+  logToFile("Application shutting down.");
   if (process.platform !== 'darwin') app.quit();
 });
