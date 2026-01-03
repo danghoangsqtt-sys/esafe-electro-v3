@@ -6,7 +6,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "vite build && electron-builder --win --x64"
+    "clean": "rimraf dist dist-electron",
+    "build": "npm run clean && vite build && electron-builder --win --x64"
   },
   "author": "DHsystem",
   "license": "ISC",
@@ -44,11 +45,15 @@
       "publisherName": "DHsystem"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "shortcutName": "E-SafePower Learning"
-    },
+  "oneClick": false,
+  "allowToChangeInstallationDirectory": true,
+  "createDesktopShortcut": true,
+  "createStartMenuShortcut": true,
+  "shortcutName": "E-SafePower Learning",
+  "installerIcon": "build/icon.ico",
+  "uninstallerIcon": "build/icon.ico",
+  "uninstallDisplayName": "Gỡ cài đặt E-SafePower"
+},
     "files": [
       "dist/**/*",
       "main.js",
