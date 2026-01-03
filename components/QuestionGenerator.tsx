@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { generateQuestionsByAI } from '../services/geminiService';
 import { Question, QuestionType, QuestionFolder } from '../types';
@@ -76,15 +77,7 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
     return QuestionType.ESSAY;
   };
 
-  // Helper function to get API Key - FIXED BUG HERE
-  const getEffectiveApiKey = () => {
-    return localStorage.getItem('manual_api_key') || process.env.API_KEY;
-  };
-
   const handleAiGenerate = async () => {
-    const apiKey = getEffectiveApiKey(); // Đã sửa: Kiểm tra cả localStorage
-    if (!apiKey) return onNotify("Vui lòng kích hoạt AI trong phần Cài đặt.", "error");
-    
     if (totalQuestions === 0) return onNotify("Hãy chọn ít nhất 1 mức độ Bloom", "warning");
     if (!pdfFile) return onNotify("Hãy tải lên tệp tài liệu nguồn", "warning");
 
@@ -164,22 +157,19 @@ const QuestionGenerator: React.FC<QuestionGeneratorProps> = ({ folders, onSaveQu
   };
 
   const handleAiFileAnalysis = async (file: File) => {
-    const apiKey = getEffectiveApiKey(); // Đã sửa: Kiểm tra cả localStorage
-    if (!apiKey) return onNotify("Vui lòng kích hoạt AI trong phần Cài đặt.", "error");
-    
     setIsLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: apiKey }); // Đã sửa: Sử dụng apiKey từ hàm helper
+      /* Enforce exclusively using process.env.API_KEY per guidelines */
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+      /* Fix contents format to use correct structure for multi-part turn per guidelines */
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [
-          {
-            parts: [
-              { text: "Hãy phân tích tệp/hình ảnh này và trích xuất toàn bộ câu hỏi. Chuyển đổi mọi công thức toán học, ký hiệu điện học thành LaTeX đặt trong dấu $...$. Nếu là tự luận, hãy tạo ra đáp án chuẩn đầy đủ cho trường 'correctAnswer'. Trả về định dạng JSON array: [{content, type, options, correctAnswer, explanation, bloomLevel, category}]. Lưu ý: Trường 'type' bắt buộc là 'MULTIPLE_CHOICE' hoặc 'ESSAY'." },
-              { inlineData: { data: await fileToBase64(file), mimeType: file.type } }
-            ]
-          }
-        ]
+        contents: {
+          parts: [
+            { text: "Hãy phân tích tệp/hình ảnh này và trích xuất toàn bộ câu hỏi. Chuyển đổi mọi công thức toán học, ký hiệu điện học thành LaTeX đặt trong dấu $...$. Nếu là tự luận, hãy tạo ra đáp án chuẩn đầy đủ cho trường 'correctAnswer'. Trả về định dạng JSON array: [{content, type, options, correctAnswer, explanation, bloomLevel, category}]. Lưu ý: Trường 'type' bắt buộc là 'MULTIPLE_CHOICE' hoặc 'ESSAY'." },
+            { inlineData: { data: await fileToBase64(file), mimeType: file.type } }
+          ]
+        }
       });
 
       const text = response.text;

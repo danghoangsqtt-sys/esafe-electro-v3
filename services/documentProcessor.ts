@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { VectorChunk, PdfMetadata } from "../types";
 import * as pdfjsLib from "pdfjs-dist";
@@ -87,8 +88,8 @@ export const embedChunks = async (
   textChunks: string[],
   onProgress?: (percent: number) => void
 ): Promise<VectorChunk[]> => {
-  const manualKey = localStorage.getItem('manual_api_key');
-  const apiKey = manualKey || process.env.API_KEY;
+  /* Enforce exclusively using process.env.API_KEY per guidelines */
+  const apiKey = process.env.API_KEY;
   if (!apiKey) throw new Error("Missing API Key.");
 
   const ai = new GoogleGenAI({ apiKey });
@@ -138,8 +139,8 @@ export const findRelevantChunks = async (
   topK: number = 5
 ): Promise<VectorChunk[]> => {
   if (knowledgeBase.length === 0) return [];
-  const manualKey = localStorage.getItem('manual_api_key');
-  const apiKey = manualKey || process.env.API_KEY;
+  /* Enforce exclusively using process.env.API_KEY per guidelines */
+  const apiKey = process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey: apiKey! });
 
   try {

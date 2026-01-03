@@ -1,4 +1,5 @@
 
+
 export enum QuestionType {
   MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
   ESSAY = 'ESSAY',
@@ -57,15 +58,6 @@ export interface ChatMessage {
   isRAG?: boolean; 
 }
 
-export interface NewsArticle {
-  id: string;
-  title: string;
-  summary: string;
-  date: string;
-  source: string;
-  content?: string; 
-}
-
 export interface AppSettings {
   modelName: string;
   aiVoice: string;
@@ -85,4 +77,13 @@ export interface AppVersionInfo {
   changelog: string;
   updateUrl: string;
   isUpdateAvailable: boolean;
+}
+
+/* Added NewsArticle interface to fix module export error */
+export interface NewsArticle {
+  id: string;
+  title: string;
+  summary: string;
+  date: string;
+  source: string;
 }

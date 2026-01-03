@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppSettings, AppVersionInfo } from '../types';
 import { checkAppUpdate } from '../services/updateService';
@@ -24,9 +23,6 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
-  const [manualKey, setManualKey] = useState(() => localStorage.getItem('manual_api_key') || '');
-  const [showKey, setShowKey] = useState(false);
-  
   const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -34,15 +30,12 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
 
   const saveSettings = () => {
     localStorage.setItem('app_settings', JSON.stringify(settings));
-    localStorage.setItem('manual_api_key', manualKey);
     onNotify("Đã cập nhật cấu hình hệ thống DHsystem.", "success");
   };
 
   const resetToDefault = () => {
     if (window.confirm("Khôi phục toàn bộ thiết lập về mặc định?")) {
       setSettings(DEFAULT_SETTINGS);
-      setManualKey('');
-      localStorage.removeItem('manual_api_key');
       onNotify("Đã đặt lại cấu hình gốc.", "info");
     }
   };
@@ -93,7 +86,6 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
         docs: JSON.parse(localStorage.getItem('elearning_docs') || '[]'),
         knowledgeBase: JSON.parse(localStorage.getItem('knowledge_base') || '[]'),
         settings: JSON.parse(localStorage.getItem('app_settings') || 'null'),
-        apiKey: localStorage.getItem('manual_api_key') || '',
         gameScores: JSON.parse(localStorage.getItem('game_scores') || '[]'),
         userInfo: JSON.parse(localStorage.getItem('last_user_info') || 'null'),
         exportDate: new Date().toISOString(),
@@ -131,7 +123,6 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
           if (data.docs) localStorage.setItem('elearning_docs', JSON.stringify(data.docs));
           if (data.knowledgeBase) localStorage.setItem('knowledge_base', JSON.stringify(data.knowledgeBase));
           if (data.settings) localStorage.setItem('app_settings', JSON.stringify(data.settings));
-          if (data.apiKey !== undefined) localStorage.setItem('manual_api_key', data.apiKey);
           if (data.gameScores) localStorage.setItem('game_scores', JSON.stringify(data.gameScores));
           if (data.userInfo) localStorage.setItem('last_user_info', JSON.stringify(data.userInfo));
 
@@ -241,22 +232,6 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                 <span className="text-[10px] font-black uppercase tracking-widest">Khôi phục</span>
                 <input type="file" className="hidden" accept=".json" onChange={handleImportBackup} />
               </label>
-            </div>
-          </section>
-
-          <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden p-8 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl shadow-inner border border-blue-100/50">
-                <i className="fas fa-fingerprint"></i>
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-800 tracking-tight">Xác thực API Gemini</h3>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Xác thực hệ thống AI</p>
-              </div>
-            </div>
-            <div className="relative">
-              <input type={showKey ? "text" : "password"} value={manualKey} onChange={e => setManualKey(e.target.value)} placeholder="Nhập mã API cá nhân..." className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-[1.5rem] font-mono text-sm outline-none focus:border-blue-500 transition-all pr-14" />
-              <button onClick={() => setShowKey(!showKey)} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 p-2"><i className={`fas ${showKey ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i></button>
             </div>
           </section>
         </div>

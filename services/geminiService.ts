@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType, VectorChunk, AppSettings } from "../types";
 import { findRelevantChunks } from "./documentProcessor";
@@ -7,9 +8,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   modelName: "gemini-3-flash-preview", 
   aiVoice: "Zephyr",
   temperature: 0.7,
-  maxOutputTokens: 1024,
+  maxOutputTokens: 2048,
   autoSave: true,
-  ragTopK: 3, 
+  ragTopK: 5, 
   thinkingBudget: 0, 
   systemExpertise: 'ACADEMIC'
 };
@@ -20,31 +21,21 @@ const getSettings = (): AppSettings => {
 };
 
 const getAI = () => {
-  const manualKey = localStorage.getItem('manual_api_key');
-  const apiKey = manualKey || process.env.API_KEY;
-  if (!apiKey) throw new Error("Chưa cấu hình API Key trong phần Cài đặt.");
-  return new GoogleGenAI({ apiKey });
+  /* Enforce exclusively using process.env.API_KEY per guidelines */
+  return new GoogleGenAI({ apiKey: process.env.API_KEY! });
 };
 
-/**
- * Rút gọn System Instruction: 
- * Loại bỏ các từ ngữ thừa, tập trung vào từ khóa để giảm Input Tokens.
- */
 const getSystemInstruction = (settings: AppSettings, contextText: string) => {
-  let instruction = `Trợ lý E-SafePower (DHSYSTEM). Chuyên môn: Nguồn điện an toàn & môi trường. Trả lời ngắn gọn, dùng Markdown & LaTeX.`;
+  let instruction = `Bạn là Trợ lý Giáo sư chuyên ngành Nguồn điện An toàn và Môi trường (Hệ thống E-SafePower - DHsystem).
+NHIỆM VỤ: Giải đáp thắc mắc về kỹ thuật điện, tiêu chuẩn an toàn (IEC, TCVN), ắc quy, nguồn năng lượng tái tạo và xử lý chất thải điện tử.
+PHONG CÁCH: Hàn lâm, chính xác, sử dụng thuật ngữ chuyên môn.
+ĐỊNH DẠNG: Sử dụng Markdown cho danh sách và LaTeX ($...$) cho các công thức điện học (Vd: $P = U.I.cos\phi$).
+TRÁNH: Trả lời lan man hoặc thiếu căn cứ kỹ thuật.`;
+
   if (contextText) {
-    instruction += `\n\nNgữ cảnh tài liệu: ${contextText}`;
+    instruction += `\n\nDựa vào kiến thức từ giáo trình sau để trả lời:\n${contextText}`;
   }
   return instruction;
-};
-
-/**
- * Kiểm tra xem tin nhắn có phải là tin nhắn rác/chào hỏi không 
- * để tránh lãng phí Token gọi Embedding & RAG.
- */
-const isTrivialMessage = (msg: string): boolean => {
-  const trivialPatterns = /^(xin chào|chào|hi|hello|hey|bye|tạm biệt|cảm ơn|thanks|ok|vâng|dạ)$/i;
-  return trivialPatterns.test(msg.trim()) || msg.trim().length < 4;
 };
 
 export const generateChatResponse = async (
@@ -59,32 +50,35 @@ export const generateChatResponse = async (
     let contextText = "";
     let ragSources: { uri: string; title: string }[] = [];
     
-    if (knowledgeBase.length > 0 && !isTrivialMessage(message)) {
+    // Tìm kiếm tri thức liên quan từ RAG
+    if (knowledgeBase.length > 0 && message.length > 5) {
       try {
         const relevantChunks = await findRelevantChunks(message, knowledgeBase, settings.ragTopK);
         if (relevantChunks.length > 0) {
           contextText = relevantChunks.map(c => c.text).join("\n\n");
-          ragSources = [{ uri: '#', title: 'Giáo trình E-SafePower' }];
+          ragSources = [{ uri: '#', title: 'Giáo trình lưu trữ nội bộ' }];
         }
       } catch (e) {
-        console.warn("[DHSYSTEM] RAG bypassed due to error.");
+        console.warn("[RAG] Bypassed");
       }
     }
 
     const modelName = config?.model || settings.modelName; 
     const systemInstruction = getSystemInstruction(settings, contextText);
 
-    const generationConfig: any = {
-      systemInstruction,
-      temperature: config?.temperature || settings.temperature,
-      maxOutputTokens: config?.maxOutputTokens || settings.maxOutputTokens,
-      tools: [], 
-    };
-
+    /* Incorporate thinkingConfig when maxOutputTokens is set to satisfy API guidelines */
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: message,
-      config: generationConfig,
+      contents: [
+        ...history,
+        { role: 'user', parts: [{ text: message }] }
+      ],
+      config: {
+        systemInstruction,
+        temperature: config?.temperature || settings.temperature,
+        maxOutputTokens: config?.maxOutputTokens || settings.maxOutputTokens,
+        thinkingConfig: { thinkingBudget: settings.thinkingBudget }
+      },
     });
 
     return {
@@ -92,7 +86,7 @@ export const generateChatResponse = async (
       sources: ragSources
     };
   } catch (error: any) {
-    console.error("[DHSYSTEM-DEBUG] Error:", error);
+    console.error("AI Error:", error);
     throw error;
   }
 };
@@ -115,7 +109,7 @@ export const generateQuestionsByAI = async (
           options: { type: Type.ARRAY, items: { type: Type.STRING } },
           correctAnswer: { type: Type.STRING },
           explanation: { type: Type.STRING },
-          category: { type: Type.STRING },
+          category: { type: Type.STRING, description: 'Chủ đề: An toàn điện, Môi trường, Pin, v.v.' },
           bloomLevel: { type: Type.STRING }
         },
         required: ["content", "type", "correctAnswer", "explanation", "category", "bloomLevel"],
@@ -128,7 +122,7 @@ export const generateQuestionsByAI = async (
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        temperature: 0.7,
+        temperature: 0.8,
       },
     });
     return JSON.parse(response.text || "[]");
@@ -147,8 +141,24 @@ export const evaluateOralAnswer = async (
       const settings = getSettings();
       const response = await ai.models.generateContent({
           model: settings.modelName,
-          contents: `Chấm điểm: Q: "${question}", Key: "${correctAnswerOrContext}", User: "${userAnswer}". Trả về JSON: {"score": number, "feedback": string}`,
-          config: { responseMimeType: "application/json", temperature: 0.2 }
+          contents: `Đánh giá câu trả lời của sinh viên.
+Câu hỏi: ${question}
+Đáp án chuẩn: ${correctAnswerOrContext}
+Câu trả lời của sinh viên: ${userAnswer}
+
+Hãy cho điểm từ 0-10 và nhận xét ngắn gọn.`,
+          config: { 
+              responseMimeType: "application/json", 
+              temperature: 0.3,
+              responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                      score: { type: Type.NUMBER },
+                      feedback: { type: Type.STRING }
+                  },
+                  required: ["score", "feedback"]
+              }
+          }
       });
       return JSON.parse(response.text || "{}");
     } catch (error) {

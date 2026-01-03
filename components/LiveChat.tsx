@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 
@@ -124,14 +123,8 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
     setIsInitializing(true);
 
     try {
-      const manualKey = localStorage.getItem('manual_api_key');
-      const apiKey = manualKey || process.env.API_KEY;
-      
-      if (!apiKey) {
-        throw new Error("Chưa cấu hình API Key.");
-      }
-
-      const ai = new GoogleGenAI({ apiKey });
+      /* Enforce exclusively using process.env.API_KEY per guidelines */
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       inputContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -176,6 +169,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                 workletNode.port.onmessage = (event) => {
                     const inputData = event.data; // Float32Array from channel 0
                     const pcmBlob = createBlob(inputData);
+                    /* Initiate sendRealtimeInput after live.connect resolves per guidelines */
                     sessionPromise.then(session => {
                         session.sendRealtimeInput({ media: pcmBlob });
                     });
@@ -188,6 +182,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                 const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
                 if (base64Audio) {
                     if (audioContextRef.current) {
+                        /* Schedule gapless audio playback per guidelines */
                         nextStartTimeRef.current = Math.max(nextStartTimeRef.current, audioContextRef.current.currentTime);
                         const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
                         const source = audioContextRef.current.createBufferSource();
@@ -210,7 +205,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                 setIsInitializing(false);
             },
             onerror: async (err: any) => {
-                setError("Lỗi kết nối AI. Vui lòng kiểm tra lại API Key.");
+                setError("Lỗi kết nối AI. Vui lòng kiểm tra lại cấu hình hệ thống.");
                 setIsConnected(false);
                 stopSession();
             }

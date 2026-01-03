@@ -179,13 +179,12 @@ const Documents: React.FC<DocumentsProps> = ({ onUpdateKnowledgeBase, onDeleteDo
     setProgress(5);
 
     try {
-        // Lưu file vào ổ cứng qua IPC nếu đang chạy Electron
         let persistentUrl = "";
         if (ipcRenderer) {
             const base64 = await fileToBase64(file);
             const result = await ipcRenderer.invoke('save-pdf', { fileName: file.name, base64Data: base64 });
             if (result.success) {
-                persistentUrl = result.filePath;
+                persistentUrl = result.filePath; // URL dạng file://
             } else {
                 throw new Error(result.error);
             }

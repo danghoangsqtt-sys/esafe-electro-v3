@@ -21,14 +21,44 @@ ipcMain.handle('save-pdf', async (event, { fileName, base64Data }) => {
     if (!fs.existsSync(docsDir)) {
       fs.mkdirSync(docsDir, { recursive: true });
     }
-    const filePath = path.join(docsDir, fileName);
+    // Tránh trùng tên tệp bằng cách thêm timestamp
+    const safeFileName = `${Date.now()}_${fileName.replace(/[^a-z0-9.]/gi, '_')}`;
+    const filePath = path.join(docsDir, safeFileName);
     const buffer = Buffer.from(base64Data, 'base64');
     fs.writeFileSync(filePath, buffer);
     logToFile(`Saved PDF to: ${filePath}`);
-    return { success: true, filePath: `file://${filePath}` };
+    // Trả về file:// URL để PDF.js có thể đọc được
+    return { success: true, filePath: `file://${filePath}`, localPath: filePath };
   } catch (err) {
     logToFile(`Error saving PDF: ${err.message}`);
     return { success: false, error: err.message };
+  }
+});
+
+// IPC handler để lưu database JSON
+ipcMain.handle('save-database', async (event, data) => {
+  try {
+    const dbPath = path.join(app.getPath('userData'), 'database.json');
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf8');
+    return { success: true };
+  } catch (err) {
+    logToFile(`Error saving database: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+});
+
+// IPC handler để tải database JSON
+ipcMain.handle('load-database', async () => {
+  try {
+    const dbPath = path.join(app.getPath('userData'), 'database.json');
+    if (fs.existsSync(dbPath)) {
+      const content = fs.readFileSync(dbPath, 'utf8');
+      return JSON.parse(content);
+    }
+    return null;
+  } catch (err) {
+    logToFile(`Error loading database: ${err.message}`);
+    return null;
   }
 });
 
@@ -41,9 +71,9 @@ function createWindow() {
     show: false,
     backgroundColor: '#0f172a',
     webPreferences: {
-      nodeIntegration: true, // Cho phép sử dụng IPC trong renderer
+      nodeIntegration: true,
       contextIsolation: false,
-      webSecurity: false, 
+      webSecurity: false, // Quan trọng để load file://
       devTools: true
     }
   });

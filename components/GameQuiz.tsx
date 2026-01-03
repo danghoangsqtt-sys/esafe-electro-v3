@@ -173,7 +173,7 @@ const TimedChallengeGame = ({ userInfo, questions, onExit, onSaveScore }: { user
         return (
             <div className="min-h-full bg-slate-900 flex items-center justify-center p-6 text-white font-inter">
                 <div className="bg-slate-800 p-12 rounded-[3.5rem] border border-white/10 text-center max-w-2xl shadow-2xl">
-                    <div className="w-24 h-24 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce shadow-[0_0_50px_rgba(249,115,22,0.4)]">
+                    <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce shadow-[0_0_50px_rgba(249,115,22,0.4)]">
                         <i className="fas fa-bolt text-4xl"></i>
                     </div>
                     <h2 className="text-4xl font-black mb-4">THỬ THÁCH HOÀN TẤT</h2>
@@ -801,20 +801,7 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
     return [...base].sort(() => 0.5 - Math.random()).slice(0, questionLimit);
   }, [questions, selectedFolderIds, questionLimit, targetGame]);
 
-  const maxAvailable = useMemo(() => {
-      let base = questions;
-      if (!selectedFolderIds.includes('all')) {
-          base = questions.filter(q => selectedFolderIds.includes(q.folderId));
-      }
-      if (targetGame === 'MILLIONAIRE' || targetGame === 'FLASHCARD') {
-          base = base.filter(q => q.type === QuestionType.MULTIPLE_CHOICE).length;
-      } else if (targetGame === 'ORAL') {
-          base = base.filter(q => q.type === QuestionType.ESSAY).length;
-      } else {
-          return base.length;
-      }
-      return 0; // Default case
-  }, [questions, selectedFolderIds, targetGame]);
+  /* Removed redundant maxAvailable useMemo block to resolve type errors on line 810 and 812 */
 
   // Re-calculate maxAvailable properly
   const calculatedMax = useMemo(() => {
@@ -846,7 +833,6 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
       setTargetGame(game);
       setMode('SETUP');
       // Set reasonable defaults for each game type
-      const currentMax = questions.length; // Placeholder, use calculatedMax in render
       if (game === 'MILLIONAIRE') setQuestionLimit(Math.min(15, 15));
       else if (game === 'FLASHCARD') setQuestionLimit(Math.min(20, 20));
       else if (game === 'TIMED') setQuestionLimit(Math.min(10, 10));
