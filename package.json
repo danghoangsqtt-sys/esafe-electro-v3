@@ -21,6 +21,7 @@
       "output": "dist"
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",

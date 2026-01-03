@@ -21,6 +21,7 @@ function createWindow() {
     width: 1280,
     height: 800,
     show: false,
+    icon: path.join(__dirname, 'icon.ico'),
     backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: false,
