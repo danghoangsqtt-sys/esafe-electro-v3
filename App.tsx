@@ -200,7 +200,7 @@ const App: React.FC = () => {
                   <Routes>
                       <Route path="/" element={<Dashboard questions={questions} knowledgeBase={knowledgeBase} />} />
                       <Route path="/documents" element={<Documents onUpdateKnowledgeBase={updateKnowledgeBase} onDeleteDocumentData={deleteKnowledgeByDocId} onNotify={showNotify} />} />
-                      <Route path="/generate" element={<QuestionGenerator folders={folders} onSaveQuestions={(q)=>setQuestions(p=>[...p,...q])} onNotify={showNotify}/>} />
+                      <Route path="/generate" element={<QuestionGenerator folders={folders} onSaveQuestions={(q)=>setQuestions(p=>[...p,...q])} onUpdateKnowledgeBase={updateKnowledgeBase} onNotify={showNotify}/>} />
                       <Route path="/bank" element={<QuestionBankManager questions={questions} setQuestions={setQuestions} folders={folders} setFolders={setFolders} showNotify={showNotify} />} />
                       <Route path="/game" element={<GameQuiz questions={questions} folders={folders} />} />
                       <Route path="/guide" element={<UserGuide />} />

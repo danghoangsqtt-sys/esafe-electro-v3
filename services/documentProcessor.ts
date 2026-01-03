@@ -64,10 +64,7 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
     return text;
 }
 
-/**
- * Cải thiện việc tách đoạn (chunking) để giữ ngữ cảnh tốt hơn
- */
-export const chunkText = (text: string, targetChunkSize: number = 800, overlap: number = 150): string[] => {
+export const chunkText = (text: string, targetChunkSize: number = 700, overlap: number = 100): string[] => {
   const cleanText = text.replace(/\s+/g, ' ').trim();
   const sentences = cleanText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleanText];
   const chunks: string[] = [];
@@ -76,7 +73,6 @@ export const chunkText = (text: string, targetChunkSize: number = 800, overlap: 
   for (const sentence of sentences) {
     if ((currentChunk.length + sentence.length) > targetChunkSize && currentChunk.length > 0) {
       chunks.push(currentChunk.trim());
-      // Giữ lại phần overlap từ cuối chunk trước
       currentChunk = currentChunk.slice(-overlap) + sentence; 
     } else {
       currentChunk += " " + sentence;
@@ -91,14 +87,12 @@ export const embedChunks = async (
   textChunks: string[],
   onProgress?: (percent: number) => void
 ): Promise<VectorChunk[]> => {
-  /* Enforce exclusively using process.env.API_KEY per guidelines */
   const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("Missing API Key.");
+  if (!apiKey) throw new Error("Missing API Key in environment.");
 
   const ai = new GoogleGenAI({ apiKey });
   const vectorChunks: VectorChunk[] = [];
 
-  // Xử lý song song từng cụm nhỏ để tránh quá tải API
   for (let i = 0; i < textChunks.length; i++) {
     try {
       const response = await ai.models.embedContent({
@@ -144,7 +138,9 @@ export const findRelevantChunks = async (
 ): Promise<VectorChunk[]> => {
   if (knowledgeBase.length === 0) return [];
   const apiKey = process.env.API_KEY;
-  const ai = new GoogleGenAI({ apiKey: apiKey! });
+  if (!apiKey) return [];
+  
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.embedContent({
@@ -160,8 +156,7 @@ export const findRelevantChunks = async (
       .slice(0, topK)
       .map(item => item.chunk);
   } catch (e) {
-    console.error("[RAG] Search Error:", e);
-    // Dự phòng: Tìm kiếm theo từ khóa cơ bản nếu embedding lỗi
+    console.error("[RAG] Vector Search Error, using fallback:", e);
     const lowerQuery = query.toLowerCase();
     return knowledgeBase
       .filter(chunk => chunk.text.toLowerCase().includes(lowerQuery))

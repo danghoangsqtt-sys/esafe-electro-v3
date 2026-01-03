@@ -1,6 +1,4 @@
 
-// Fix: Exclusively use process.env.API_KEY per guidelines (line 22)
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType, VectorChunk, AppSettings } from "../types";
 import { findRelevantChunks } from "./documentProcessor";
@@ -21,14 +19,15 @@ const getSettings = (): AppSettings => {
   return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
 };
 
+/**
+ * Khởi tạo AI Engine sử dụng duy nhất API_KEY từ biến môi trường theo quy định bảo mật của hệ thống.
+ * Chú ý: Việc quản lý API Key được thực hiện ở cấp độ cấu hình môi trường thực thi (process.env.API_KEY).
+ */
 const getAI = () => {
-  // Fix: Exclusively use process.env.API_KEY per guidelines
   const apiKey = process.env.API_KEY;
-  
   if (!apiKey) {
-    throw new Error("API Key chưa được cấu hình. Vui lòng kiểm tra biến môi trường API_KEY.");
+    throw new Error("LỖI HỆ THỐNG: API_KEY không được tìm thấy trong biến môi trường. Vui lòng cấu hình API_KEY để kích hoạt tính năng AI.");
   }
-  
   return new GoogleGenAI({ apiKey });
 };
 
@@ -57,15 +56,17 @@ export const generateChatResponse = async (
     let contextText = "";
     let ragSources: { uri: string; title: string }[] = [];
     
-    if (knowledgeBase.length > 0 && message.length > 5) {
+    // Nâng cấp logic truy xuất tri thức RAG
+    if (knowledgeBase.length > 0 && message.length > 3) {
       try {
-        const relevantChunks = await findRelevantChunks(message, knowledgeBase, settings.ragTopK);
+        const topK = config?.maxOutputTokens ? Math.min(settings.ragTopK, 8) : settings.ragTopK;
+        const relevantChunks = await findRelevantChunks(message, knowledgeBase, topK);
         if (relevantChunks.length > 0) {
           contextText = relevantChunks.map(c => c.text).join("\n\n");
-          ragSources = [{ uri: '#', title: 'Giáo trình lưu trữ nội bộ' }];
+          ragSources = [{ uri: '#', title: 'Tri thức từ Giáo trình Hệ thống' }];
         }
       } catch (e) {
-        console.warn("[RAG] Bypassed");
+        console.warn("[RAG-ERROR] Bỏ qua truy xuất tri thức do lỗi kỹ thuật.");
       }
     }
 
@@ -81,17 +82,17 @@ export const generateChatResponse = async (
       config: {
         systemInstruction,
         temperature: config?.temperature || settings.temperature,
-        maxOutputTokens: config?.maxOutputTokens || settings.maxOutputTokens,
-        thinkingConfig: { thinkingBudget: settings.thinkingBudget }
+        // Không ép buộc maxOutputTokens trừ khi thực sự cần để tránh lỗi thinkingBudget
+        maxOutputTokens: config?.maxOutputTokens,
       },
     });
 
     return {
-      text: response.text,
+      text: response.text || "AI không thể tạo phản hồi vào lúc này.",
       sources: ragSources
     };
   } catch (error: any) {
-    console.error("AI Error:", error);
+    console.error("AI Core Error:", error);
     throw error;
   }
 };
@@ -114,7 +115,7 @@ export const generateQuestionsByAI = async (
           options: { type: Type.ARRAY, items: { type: Type.STRING } },
           correctAnswer: { type: Type.STRING },
           explanation: { type: Type.STRING },
-          category: { type: Type.STRING, description: 'Chủ đề: An toàn điện, Môi trường, Pin, v.v.' },
+          category: { type: Type.STRING },
           bloomLevel: { type: Type.STRING }
         },
         required: ["content", "type", "correctAnswer", "explanation", "category", "bloomLevel"],
@@ -123,13 +124,14 @@ export const generateQuestionsByAI = async (
 
     const response = await ai.models.generateContent({
       model: settings.modelName,
-      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      contents: promptText,
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
         temperature: 0.8,
       },
     });
+    
     return JSON.parse(response.text || "[]");
   } catch (error) {
     console.error("AI Generation Error:", error);
@@ -147,12 +149,7 @@ export const evaluateOralAnswer = async (
       const settings = getSettings();
       const response = await ai.models.generateContent({
           model: settings.modelName,
-          contents: [{ 
-            role: 'user', 
-            parts: [{ 
-              text: `Đánh giá câu trả lời của sinh viên.\nCâu hỏi: ${question}\nĐáp án chuẩn: ${correctAnswerOrContext}\nCâu trả lời của sinh viên: ${userAnswer}\n\nHãy cho điểm từ 0-10 và nhận xét ngắn gọn.` 
-            }] 
-          }],
+          contents: `Đánh giá câu trả lời của sinh viên.\nCâu hỏi: ${question}\nĐáp án chuẩn/Ngữ cảnh: ${correctAnswerOrContext}\nCâu trả lời của sinh viên: ${userAnswer}\n\nHãy cho điểm từ 0-10 và nhận xét ngắn gọn về mặt chuyên môn điện học.`,
           config: { 
               responseMimeType: "application/json", 
               temperature: 0.3,
