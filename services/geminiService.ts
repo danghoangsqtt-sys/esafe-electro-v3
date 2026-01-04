@@ -24,7 +24,15 @@ const getSettings = (): AppSettings => {
  * Lấy GoogleGenAI instance sử dụng API Key từ biến môi trường process.env.API_KEY.
  */
 const getAI = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const settings = getSettings();
+  // Ưu tiên lấy manualApiKey từ Settings, sau đó mới đến biến môi trường
+  const apiKey = (settings as any).manualApiKey || process.env.API_KEY || "";
+  
+  if (!apiKey) {
+    console.error("Gemini API Key không tồn tại!");
+  }
+  
+  return new GoogleGenAI({ apiKey });
 };
 
 const getSystemInstruction = (settings: AppSettings, contextText: string) => {

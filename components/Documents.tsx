@@ -22,89 +22,100 @@ const PdfViewer: React.FC<{ url: string; isFullScreen: boolean; onToggleFullScre
     const [pdf, setPdf] = useState<any>(null);
     const [pageNum, setPageNum] = useState(1);
     const [total, setTotal] = useState(0);
-    const [scale, setScale] = useState(1.1);
+    const [scale, setScale] = useState(1.2); // Tăng tỷ lệ mặc định cho rõ nét
     const [loading, setLoading] = useState(true);
-    const [inputPage, setInputPage] = useState("1");
-    const [error, setError] = useState<string | null>(null);
-    const [thumbnails, setThumbnails] = useState<string[]>([]);
-    const [showThumbnails, setShowThumbnails] = useState(false);
 
-    const loadPdf = useCallback(async () => {
+    // Tải tài liệu PDF
+    useEffect(() => {
         setLoading(true);
-        setError(null);
-        try {
-            const loadingTask = pdfjsLib.getDocument(url);
-            const loadedPdf = await loadingTask.promise;
-            setPdf(loadedPdf);
-            setTotal(loadedPdf.numPages);
+        const loadingTask = pdfjsLib.getDocument(url);
+        loadingTask.promise.then((pdfDoc: any) => {
+            setPdf(pdfDoc);
+            setTotal(pdfDoc.numPages);
+            setPageNum(1); // Luôn bắt đầu từ trang 1 khi mở tệp mới
             setLoading(false);
-
-            const thumbList: string[] = [];
-            for (let i = 1; i <= Math.min(10, loadedPdf.numPages); i++) {
-                const page = await loadedPdf.getPage(i);
-                const viewport = page.getViewport({ scale: 0.2 });
-                const canvas = document.createElement('canvas');
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-                await page.render({ canvasContext: canvas.getContext('2d')!, viewport, canvas }).promise;
-                thumbList.push(canvas.toDataURL());
-            }
-            setThumbnails(thumbList);
-        } catch (err: any) {
-            setError("Lỗi tải PDF.");
-            setLoading(false);
-        }
+        }).catch(() => setLoading(false));
     }, [url]);
 
-    useEffect(() => { loadPdf(); }, [loadPdf]);
-
-    const renderPage = useCallback(async () => {
+    // Vẽ trang PDF lên màn hình
+    useEffect(() => {
         if (!pdf || !canvasRef.current) return;
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale });
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-        if (!context) return;
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        await page.render({ canvasContext: context, viewport, canvas }).promise;
+        
+        pdf.getPage(pageNum).then((page: any) => {
+            const viewport = page.getViewport({ scale });
+            const canvas = canvasRef.current!;
+            const context = canvas.getContext('2d');
+            
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            page.render(renderContext);
+        });
     }, [pdf, pageNum, scale]);
 
-    useEffect(() => { renderPage(); }, [renderPage]);
-
     return (
-        <div className={`flex h-full bg-[#111827] transition-all relative ${isFullScreen ? 'fixed inset-0 z-[100]' : 'rounded-3xl overflow-hidden border border-gray-800'}`}>
-             {showThumbnails && (
-                 <aside className="w-52 bg-gray-900 border-r border-white/10 flex flex-col overflow-hidden">
-                     <div className="p-4 border-b border-white/5 flex justify-between items-center shrink-0">
-                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Xem trước</span>
-                         <button onClick={() => setShowThumbnails(false)} className="text-gray-500 hover:text-white"><i className="fas fa-chevron-left"></i></button>
-                     </div>
-                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                         {thumbnails.map((src, i) => (
-                             <div key={i} onClick={() => setPageNum(i + 1)} className={`cursor-pointer rounded-lg overflow-hidden border-2 ${pageNum === i + 1 ? 'border-blue-500' : 'border-transparent opacity-60'}`}>
-                                 <img src={src} className="w-full h-auto" />
-                             </div>
-                         ))}
-                     </div>
-                 </aside>
-             )}
-             <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="bg-gray-900/95 p-3 flex justify-between items-center z-20 sticky top-0 px-6">
-                    <div className="flex items-center gap-4 text-white">
-                        <button onClick={() => setShowThumbnails(!showThumbnails)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5"><i className="fas fa-th-list"></i></button>
-                        <span>{pageNum} / {total}</span>
+        <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden relative group">
+            {/* Thanh công cụ (Toolbar) chuyên nghiệp */}
+            <div className="bg-slate-800/90 backdrop-blur-md p-3 border-b border-slate-700 flex items-center justify-between z-10 shadow-lg">
+                <div className="flex items-center gap-4">
+                    <div className="flex bg-slate-700 rounded-lg p-1 shadow-inner">
+                        <button onClick={() => setPageNum(Math.max(1, pageNum - 1))} className="w-8 h-8 rounded-md hover:bg-slate-600 text-white transition flex items-center justify-center">
+                            <i className="fas fa-chevron-left text-xs"></i>
+                        </button>
+                        <div className="px-4 flex items-center gap-2 text-xs font-black text-white border-x border-slate-600">
+                            <span>TRANG</span>
+                            <span className="bg-blue-600 px-2 py-0.5 rounded text-[10px]">{pageNum}</span>
+                            <span className="text-slate-400">/ {total}</span>
+                        </div>
+                        <button onClick={() => setPageNum(Math.min(total, pageNum + 1))} className="w-8 h-8 rounded-md hover:bg-slate-600 text-white transition flex items-center justify-center">
+                            <i className="fas fa-chevron-right text-xs"></i>
+                        </button>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <button onClick={onToggleFullScreen} className="w-9 h-9 flex items-center justify-center bg-blue-600 rounded-xl text-white">
-                            <i className={`fas ${isFullScreen ? 'fa-compress' : 'fa-expand'}`}></i>
+
+                    <div className="flex bg-slate-700 rounded-lg p-1">
+                        <button onClick={() => setScale(Math.max(0.5, scale - 0.2))} className="w-8 h-8 text-white hover:bg-slate-600 rounded-md transition" title="Thu nhỏ">
+                            <i className="fas fa-search-minus text-xs"></i>
+                        </button>
+                        <button onClick={() => setScale(1.2)} className="px-3 text-[10px] font-bold text-slate-300 hover:text-white transition" title="Reset zoom">
+                            {Math.round(scale * 100)}%
+                        </button>
+                        <button onClick={() => setScale(Math.min(3, scale + 0.2))} className="w-8 h-8 text-white hover:bg-slate-600 rounded-md transition" title="Phóng to">
+                            <i className="fas fa-search-plus text-xs"></i>
                         </button>
                     </div>
                 </div>
-                <div className="flex-1 overflow-auto flex flex-col items-center p-8">
-                    {loading ? <div className="text-white">Đang nạp...</div> : <canvas ref={canvasRef} />}
+
+                <div className="flex items-center gap-2">
+                    <button onClick={onToggleFullScreen} className="w-10 h-10 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-900/20 hover:bg-blue-500 transition-all flex items-center justify-center">
+                        <i className={`fas ${isFullScreen ? 'fa-compress' : 'fa-expand'}`}></i>
+                    </button>
                 </div>
-             </div>
+            </div>
+
+            {/* Vùng hiển thị tài liệu */}
+            <div className="flex-1 overflow-auto p-8 flex justify-center custom-scrollbar bg-slate-900">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center text-blue-400 gap-4">
+                        <i className="fas fa-circle-notch fa-spin text-4xl"></i>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Đang tải tài liệu...</span>
+                    </div>
+                ) : (
+                    <div className="shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-white rounded-sm mb-10 border border-slate-700">
+                        <canvas ref={canvasRef} className="max-w-full h-auto" />
+                    </div>
+                )}
+            </div>
+
+            {/* Chỉ báo cuộn hoặc phím tắt */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-blue-600/90 text-[10px] font-black text-white px-4 py-2 rounded-full backdrop-blur-md shadow-2xl border border-blue-400/30">
+                    SỬ DỤNG PHÍM MŨI TÊN ĐỂ CHUYỂN TRANG
+                </div>
+            </div>
         </div>
     );
 };

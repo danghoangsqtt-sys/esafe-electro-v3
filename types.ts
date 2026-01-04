@@ -60,6 +60,7 @@ export interface ChatMessage {
 
 export interface AppSettings {
   modelName: string;
+  manualApiKey?: string;
   aiVoice: string;
   temperature: number;
   maxOutputTokens: number;

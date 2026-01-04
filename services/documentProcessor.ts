@@ -105,7 +105,9 @@ export const embedChunks = async (
   textChunks: string[],
   onProgress?: (percent: number) => void
 ): Promise<VectorChunk[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const savedSettings = localStorage.getItem('app_settings');
+  const manualApiKey = savedSettings ? JSON.parse(savedSettings).manualApiKey : null;
+  const ai = new GoogleGenAI({ apiKey: manualApiKey || process.env.API_KEY || "" });
   const vectorChunks: VectorChunk[] = [];
 
   for (let i = 0; i < textChunks.length; i++) {
@@ -151,7 +153,9 @@ export const findRelevantChunks = async (
   topK: number = 5
 ): Promise<VectorChunk[]> => {
   if (knowledgeBase.length === 0) return [];
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const savedSettings = localStorage.getItem('app_settings');
+  const manualApiKey = savedSettings ? JSON.parse(savedSettings).manualApiKey : null;
+  const ai = new GoogleGenAI({ apiKey: manualApiKey || process.env.API_KEY || "" });
 
   try {
     const response = await ai.models.embedContent({
