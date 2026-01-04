@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType, VectorChunk, AppSettings } from "../types";
 import { findRelevantChunks } from "./documentProcessor";
@@ -20,26 +21,21 @@ const getSettings = (): AppSettings => {
 };
 
 /**
- * Khởi tạo AI Engine sử dụng duy nhất API_KEY từ biến môi trường theo quy định bảo mật của hệ thống.
- * Chú ý: Việc quản lý API Key được thực hiện ở cấp độ cấu hình môi trường thực thi (process.env.API_KEY).
+ * Lấy GoogleGenAI instance sử dụng API Key từ biến môi trường process.env.API_KEY.
  */
 const getAI = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("LỖI HỆ THỐNG: API_KEY không được tìm thấy trong biến môi trường. Vui lòng cấu hình API_KEY để kích hoạt tính năng AI.");
-  }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 const getSystemInstruction = (settings: AppSettings, contextText: string) => {
-  let instruction = `Bạn là Trợ lý Giáo sư chuyên ngành Nguồn điện An toàn và Môi trường (Hệ thống E-SafePower - DHsystem).
-NHIỆM VỤ: Giải đáp thắc mắc về kỹ thuật điện, tiêu chuẩn an toàn (IEC, TCVN), ắc quy, nguồn năng lượng tái tạo và xử lý chất thải điện tử.
-PHONG CÁCH: Hàn lâm, chính xác, sử dụng thuật ngữ chuyên môn.
-ĐỊNH DẠNG: Sử dụng Markdown cho danh sách và LaTeX ($...$) cho các công thức điện học (Vd: $P = U.I.cos\\phi$).
-TRÁNH: Trả lời lan man hoặc thiếu căn cứ kỹ thuật.`;
+  let instruction = `Bạn là Chuyên gia Cao cấp kiêm Giảng viên môn "Nguồn điện An toàn và Môi trường". 
+NHIỆM VỤ: Giải đáp thắc mắc về kỹ thuật điện, tiêu chuẩn an toàn (IEC 60364, TCVN), các loại nguồn điện (PV, Wind, Battery), và tác động môi trường của ngành năng lượng.
+PHONG CÁCH: Chuyên nghiệp, chính xác, sử dụng thuật ngữ kỹ thuật chuẩn xác.
+ĐỊNH DẠNG: Sử dụng Markdown. Sử dụng LaTeX ($...$) cho công thức.
+KIẾN THỨC CẬP NHẬT: Sử dụng công cụ Google Search để tìm các quy định mới nhất.`;
 
   if (contextText) {
-    instruction += `\n\nDựa vào kiến thức từ giáo trình sau để trả lời:\n${contextText}`;
+    instruction += `\n\nSử dụng thêm tri thức từ giáo trình này để trả lời:\n${contextText}`;
   }
   return instruction;
 };
@@ -56,17 +52,16 @@ export const generateChatResponse = async (
     let contextText = "";
     let ragSources: { uri: string; title: string }[] = [];
     
-    // Nâng cấp logic truy xuất tri thức RAG
     if (knowledgeBase.length > 0 && message.length > 3) {
       try {
-        const topK = config?.maxOutputTokens ? Math.min(settings.ragTopK, 8) : settings.ragTopK;
+        const topK = settings.ragTopK;
         const relevantChunks = await findRelevantChunks(message, knowledgeBase, topK);
         if (relevantChunks.length > 0) {
           contextText = relevantChunks.map(c => c.text).join("\n\n");
-          ragSources = [{ uri: '#', title: 'Tri thức từ Giáo trình Hệ thống' }];
+          ragSources = [{ uri: '#', title: 'Tri thức nội bộ hệ thống' }];
         }
       } catch (e) {
-        console.warn("[RAG-ERROR] Bỏ qua truy xuất tri thức do lỗi kỹ thuật.");
+        console.warn("[RAG-ERROR] Skipping RAG.");
       }
     }
 
@@ -82,14 +77,20 @@ export const generateChatResponse = async (
       config: {
         systemInstruction,
         temperature: config?.temperature || settings.temperature,
-        // Không ép buộc maxOutputTokens trừ khi thực sự cần để tránh lỗi thinkingBudget
-        maxOutputTokens: config?.maxOutputTokens,
+        tools: [{ googleSearch: {} }]
       },
     });
 
+    const searchSources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter((chunk: any) => chunk.web)
+      ?.map((chunk: any) => ({
+        uri: chunk.web.uri,
+        title: chunk.web.title
+      })) || [];
+
     return {
-      text: response.text || "AI không thể tạo phản hồi vào lúc này.",
-      sources: ragSources
+      text: response.text || "AI không thể tạo phản hồi.",
+      sources: [...ragSources, ...searchSources]
     };
   } catch (error: any) {
     console.error("AI Core Error:", error);
@@ -133,8 +134,7 @@ export const generateQuestionsByAI = async (
     });
     
     return JSON.parse(response.text || "[]");
-  } catch (error) {
-    console.error("AI Generation Error:", error);
+  } catch (error: any) {
     throw error;
   }
 };
@@ -149,7 +149,7 @@ export const evaluateOralAnswer = async (
       const settings = getSettings();
       const response = await ai.models.generateContent({
           model: settings.modelName,
-          contents: `Đánh giá câu trả lời của sinh viên.\nCâu hỏi: ${question}\nĐáp án chuẩn/Ngữ cảnh: ${correctAnswerOrContext}\nCâu trả lời của sinh viên: ${userAnswer}\n\nHãy cho điểm từ 0-10 và nhận xét ngắn gọn về mặt chuyên môn điện học.`,
+          contents: `Đánh giá câu trả lời môn học Nguồn điện an toàn và môi trường.\nCâu hỏi: ${question}\nĐáp án chuẩn: ${correctAnswerOrContext}\nCâu trả lời sinh viên: ${userAnswer}`,
           config: { 
               responseMimeType: "application/json", 
               temperature: 0.3,
@@ -164,7 +164,7 @@ export const evaluateOralAnswer = async (
           }
       });
       return JSON.parse(response.text || "{}");
-    } catch (error) {
+    } catch (error: any) {
       throw error;
     }
 };

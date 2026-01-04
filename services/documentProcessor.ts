@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { VectorChunk, PdfMetadata } from "../types";
 import * as pdfjsLib from "pdfjs-dist";
@@ -55,6 +56,7 @@ export const extractDataFromPDF = async (fileOrUrl: File | string): Promise<{ te
     }
     return { text: fullText, metadata };
   } catch (error) {
+    console.error("[PDF-EXTRACT-ERROR]", error);
     throw error;
   }
 };
@@ -64,22 +66,38 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
     return text;
 }
 
-export const chunkText = (text: string, targetChunkSize: number = 700, overlap: number = 100): string[] => {
-  const cleanText = text.replace(/\s+/g, ' ').trim();
-  const sentences = cleanText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleanText];
+export const chunkText = (text: string, targetChunkSize: number = 1000, overlap: number = 200): string[] => {
+  const cleanText = text.replace(/[ \t]+/g, ' ').trim();
+  const paragraphs = cleanText.split(/\n\s*\n/);
   const chunks: string[] = [];
   let currentChunk = "";
   
-  for (const sentence of sentences) {
-    if ((currentChunk.length + sentence.length) > targetChunkSize && currentChunk.length > 0) {
+  for (const paragraph of paragraphs) {
+    if ((currentChunk.length + paragraph.length) > targetChunkSize && currentChunk.length > 0) {
       chunks.push(currentChunk.trim());
-      currentChunk = currentChunk.slice(-overlap) + sentence; 
+      currentChunk = currentChunk.slice(-overlap) + " " + paragraph; 
     } else {
-      currentChunk += " " + sentence;
+      currentChunk += (currentChunk ? "\n\n" : "") + paragraph;
+    }
+    
+    if (currentChunk.length > targetChunkSize * 1.5) {
+        const sentences = currentChunk.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [currentChunk];
+        currentChunk = "";
+        for (const sentence of sentences) {
+            if ((currentChunk.length + sentence.length) > targetChunkSize && currentChunk.length > 0) {
+                chunks.push(currentChunk.trim());
+                currentChunk = currentChunk.slice(-overlap) + sentence;
+            } else {
+                currentChunk += sentence;
+            }
+        }
     }
   }
-  if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
-  return chunks;
+  
+  if (currentChunk.trim().length > 0) {
+    chunks.push(currentChunk.trim());
+  }
+  return chunks.filter(c => c.length > 60); 
 };
 
 export const embedChunks = async (
@@ -87,10 +105,7 @@ export const embedChunks = async (
   textChunks: string[],
   onProgress?: (percent: number) => void
 ): Promise<VectorChunk[]> => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("Missing API Key in environment.");
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const vectorChunks: VectorChunk[] = [];
 
   for (let i = 0; i < textChunks.length; i++) {
@@ -109,9 +124,8 @@ export const embedChunks = async (
         });
       }
     } catch (e: any) {
-      console.error(`Embedding failed at chunk ${i}:`, e);
       if (e.toString().includes('429')) {
-        await new Promise(r => setTimeout(r, 5000));
+        await new Promise(r => setTimeout(r, 4500));
         i--;
         continue;
       }
@@ -137,10 +151,7 @@ export const findRelevantChunks = async (
   topK: number = 5
 ): Promise<VectorChunk[]> => {
   if (knowledgeBase.length === 0) return [];
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) return [];
-  
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     const response = await ai.models.embedContent({
@@ -156,7 +167,6 @@ export const findRelevantChunks = async (
       .slice(0, topK)
       .map(item => item.chunk);
   } catch (e) {
-    console.error("[RAG] Vector Search Error, using fallback:", e);
     const lowerQuery = query.toLowerCase();
     return knowledgeBase
       .filter(chunk => chunk.text.toLowerCase().includes(lowerQuery))

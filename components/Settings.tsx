@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppSettings, AppVersionInfo } from '../types';
 import { checkAppUpdate } from '../services/updateService';
@@ -21,7 +20,9 @@ const DEFAULT_SETTINGS: AppSettings = {
 const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    // Đảm bảo manualApiKey tồn tại trong state
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, ...parsed };
   });
 
   const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
@@ -33,26 +34,16 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
     const kb = JSON.parse(localStorage.getItem('knowledge_base') || '[]');
     setKbSize(kb.length);
     
-    // Kiểm tra trạng thái Key hệ thống
-    const checkKey = async () => {
-      if ((window as any).aistudio?.hasSelectedApiKey) {
-        const selected = await (window as any).aistudio.hasSelectedApiKey();
-        setHasKey(selected || !!process.env.API_KEY);
-      } else {
-        setHasKey(!!process.env.API_KEY);
-      }
-    };
-    checkKey();
-  }, []);
+    // Kiểm tra trạng thái Key hệ thống (ưu tiên key người dùng nhập tay)
+    setHasKey(!!settings.manualApiKey || !!process.env.API_KEY);
+  }, [settings.manualApiKey]);
 
   const handleSelectKey = async () => {
     if ((window as any).aistudio?.openSelectKey) {
       await (window as any).aistudio.openSelectKey();
       onNotify("Đã mở trình cấu hình API Key hệ thống.", "info");
-      // Sau khi trigger mở, ta giả định người dùng sẽ thực hiện thao tác
-      setHasKey(true);
     } else {
-      onNotify("Môi trường hiện tại không hỗ trợ trình chọn Key tự động.", "error");
+      onNotify("Vui lòng nhập Key trực tiếp vào ô bên dưới.", "info");
     }
   };
 
@@ -114,7 +105,7 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    e.target.value = ''; 
   };
 
   const clearAllData = () => {
@@ -159,29 +150,47 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* API & Status Card */}
         <div className="lg:col-span-2 space-y-8">
           <section className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-10 space-y-10">
-            <div className="flex items-center justify-between border-b border-slate-50 pb-6">
-                <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${hasKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                        <i className={`fas ${hasKey ? 'fa-check-circle' : 'fa-triangle-exclamation'}`}></i>
+            <div className="flex flex-col border-b border-slate-50 pb-8 space-y-6">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${hasKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                            <i className={`fas ${hasKey ? 'fa-check-circle' : 'fa-triangle-exclamation'}`}></i>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-slate-900 uppercase tracking-tight text-sm">AI Engine Connectivity</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{hasKey ? 'Hệ thống đã nhận diện khóa API' : 'Yêu cầu cấu hình API Key'}</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="font-black text-slate-900 uppercase tracking-tight text-sm">AI Engine Connectivity</h3>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{hasKey ? 'Hệ thống đã nhận diện khóa API' : 'Yêu cầu cấu hình API Key'}</p>
+                    <div className={`px-4 py-2 rounded-xl border font-black text-[10px] uppercase transition-colors ${hasKey ? 'bg-green-50 border-green-100 text-green-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                        {hasKey ? 'CONNECTED' : 'DISCONNECTED'}
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={handleSelectKey}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-blue-700 transition"
-                  >
-                    Cấu hình Key
-                  </button>
-                  <div className={`px-4 py-2 rounded-xl border font-black text-[10px] uppercase transition-colors ${hasKey ? 'bg-green-50 border-green-100 text-green-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                      {hasKey ? 'CONNECTED' : 'DISCONNECTED'}
-                  </div>
+
+                {/* API KEY INPUT FIELD */}
+                <div className="space-y-4 pt-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <i className="fas fa-key text-blue-500"></i> Gemini API Key của bạn
+                    </label>
+                    <div className="flex gap-3">
+                        <input 
+                            type="password" 
+                            value={settings.manualApiKey || ''}
+                            onChange={e => setSettings({...settings, manualApiKey: e.target.value})}
+                            placeholder="Dán API Key (AIza...) tại đây"
+                            className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        />
+                        <button 
+                            onClick={handleSelectKey}
+                            className="px-6 py-2 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-200 transition"
+                        >
+                            AI Studio
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 italic">
+                        Lưu ý: API Key của bạn được lưu cục bộ trên trình duyệt/máy tính này, không gửi về máy chủ DHsystem.
+                    </p>
                 </div>
             </div>
 
@@ -198,8 +207,8 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                         >
                             <option value="gemini-3-flash-preview">Gemini 3 Flash (Tối ưu nhất)</option>
                             <option value="gemini-3-pro-preview">Gemini 3 Pro (Phân tích sâu)</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ổn định)</option>
                         </select>
-                        <p className="text-[10px] text-slate-400 italic">Mô hình mặc định được tối ưu cho kiến thức an toàn điện.</p>
                     </div>
 
                     <div className="space-y-4">
@@ -243,14 +252,12 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                             onChange={e => setSettings({...settings, ragTopK: parseInt(e.target.value)})} 
                             className="w-full h-1.5 bg-slate-100 rounded-full appearance-none accent-blue-600 cursor-pointer" 
                         />
-                        <p className="text-[10px] text-slate-400 italic">Số lượng phân đoạn văn bản từ giáo trình PDF mà AI sẽ đọc để trả lời.</p>
                     </div>
                 </div>
             </div>
           </section>
         </div>
 
-        {/* Sidebar Info & Data */}
         <div className="space-y-8">
           <section className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl">
              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -mr-16 -mt-16 blur-3xl"></div>
@@ -261,9 +268,6 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                 <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
                     <p className="text-[10px] text-slate-400 font-black uppercase mb-1">Dung lượng tri thức nạp</p>
                     <p className="text-4xl font-black">{kbSize} <span className="text-sm font-bold text-slate-500 tracking-normal">Chunks</span></p>
-                </div>
-                <div className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                   Mọi dữ liệu vector được lưu trữ cục bộ tại trình duyệt để đảm bảo tốc độ truy xuất RAG và tính riêng tư.
                 </div>
                 <button onClick={clearAllData} className="w-full py-4 bg-red-500/10 text-red-400 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">
                     Xóa sạch tri thức (Dọn kho)
@@ -296,9 +300,6 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                     </div>
                     <input type="file" className="hidden" accept=".json" onChange={handleImportBackup} />
                 </label>
-             </div>
-             <div className="mt-6 pt-6 border-t border-slate-50 text-center">
-                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Build ID: DHSYSTEM-2026-PRO</p>
              </div>
           </section>
         </div>

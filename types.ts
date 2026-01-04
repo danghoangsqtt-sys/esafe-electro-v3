@@ -79,7 +79,6 @@ export interface AppVersionInfo {
   isUpdateAvailable: boolean;
 }
 
-/* Added NewsArticle interface to fix module export error */
 export interface NewsArticle {
   id: string;
   title: string;
