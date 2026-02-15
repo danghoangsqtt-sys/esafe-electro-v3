@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { generateChatResponse } from '../services/geminiService';
 import { ChatMessage, VectorChunk } from '../types';
 import LiveChat from './LiveChat';
+import { formatContent } from '../utils/textFormatter';
 
 interface ChatbotProps {
   temperature?: number;
@@ -29,34 +30,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ temperature, maxTokens, aiVoice = 'Ko
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const formatContent = (text: string) => {
-    if (!text) return null;
-    
-    // 1. Replace newlines with <br /> first to avoid breaking KaTeX SVG later
-    let html = text.replace(/\n/g, '<br />');
-
-    // 2. Render Display Math
-    html = html.replace(/\$\$(.*?)\$\$/gs, (_, math) => {
-      try {
-        const cleanMath = math.replace(/<br \/>/g, '\n');
-        return (window as any).katex.renderToString(cleanMath, { displayMode: true, throwOnError: false });
-      } catch (e) { return math; }
-    });
-
-    // 3. Render Inline Math
-    html = html.replace(/\$(.*?)\$/g, (_, math) => {
-      try {
-        const cleanMath = math.replace(/<br \/>/g, '\n');
-        return (window as any).katex.renderToString(cleanMath, { displayMode: false, throwOnError: false });
-      } catch (e) { return math; }
-    });
-
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-black text-blue-900">$1</strong>');
-    html = html.replace(/^\s*-\s+(.*)$/gm, '<li class="ml-4 list-disc mb-1">$1</li>');
-
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
   };
 
   useEffect(() => {
@@ -175,7 +148,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ temperature, maxTokens, aiVoice = 'Ko
                                             <i className="fas fa-brain-circuit"></i> NGUỒN TRI THỨC GIÁO TRÌNH
                                         </div>
                                     )}
-                                    <div className="leading-relaxed math-content overflow-wrap-anywhere font-medium">
+                                    <div className="leading-relaxed font-medium">
                                       {formatContent(msg.text)}
                                     </div>
                                     {msg.sources && msg.sources.length > 0 && (

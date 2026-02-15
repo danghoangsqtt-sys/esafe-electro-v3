@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Question, QuestionType, QuestionFolder } from '../../types';
+import { formatContent } from '../../utils/textFormatter';
 
 interface ReviewListProps {
   questions: Question[];
@@ -21,20 +22,6 @@ const ReviewList: React.FC<ReviewListProps> = ({
   onApproveAll, 
   onCancel 
 }) => {
-  const formatText = (text: string) => {
-    if (!text) return null;
-    let html = text;
-    html = html.replace(/\$\$(.*?)\$\$/gs, (_, math) => {
-      try { return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false }); } catch (e) { return math; }
-    });
-    html = html.replace(/\$(.*?)\$/g, (_, math) => {
-      try { return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false }); } catch (e) { return math; }
-    });
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\n/g, '<br />');
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
-  };
-
   const folderName = folders.find(f => f.id === selectedFolderId)?.name || "Mặc định";
 
   return (
@@ -81,10 +68,12 @@ const ReviewList: React.FC<ReviewListProps> = ({
                  <textarea 
                     value={q.content}
                     onChange={(e) => onUpdateQuestion(i, { ...q, content: e.target.value })}
-                    className="w-full bg-transparent border-none font-bold text-gray-800 text-xl leading-relaxed outline-none focus:ring-0 resize-none p-0 math-content"
+                    className="w-full bg-transparent border-none font-bold text-gray-800 text-xl leading-relaxed outline-none focus:ring-0 resize-none p-0"
                     rows={2}
                  />
-                 <div className="mt-2 text-xs text-gray-400 italic">Preview: {formatText(q.content)}</div>
+                 <div className="mt-2 text-xs text-gray-400 italic">
+                   Preview: {formatContent(q.content)}
+                 </div>
              </div>
 
              {q.options && q.type === QuestionType.MULTIPLE_CHOICE ? (
@@ -126,7 +115,9 @@ const ReviewList: React.FC<ReviewListProps> = ({
                     className="w-full bg-transparent border-none text-gray-700 leading-relaxed font-medium focus:ring-0 resize-none p-0"
                     rows={3}
                   />
-                  <div className="mt-2 text-xs text-gray-400 italic">Preview: {formatText(q.correctAnswer)}</div>
+                  <div className="mt-2 text-xs text-gray-400 italic">
+                    Preview: {formatContent(q.correctAnswer)}
+                  </div>
                </div>
              )}
              

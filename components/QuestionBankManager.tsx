@@ -1,5 +1,7 @@
+
 import React, { useState, useMemo } from 'react';
 import { Question, QuestionFolder, QuestionType } from '../types';
+import { formatContent } from '../utils/textFormatter';
 
 interface QuestionBankManagerProps {
   questions: Question[];
@@ -21,32 +23,6 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
 
   // Edit State
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-
-  /**
-   * Hàm render nội dung có chứa LaTeX và Markdown
-   */
-  const formatContent = (text: string) => {
-    if (!text) return null;
-    let html = text;
-
-    // 1. Render KaTeX
-    html = html.replace(/\$\$(.*?)\$\$/gs, (_, math) => {
-      try {
-        return (window as any).katex.renderToString(math, { displayMode: true, throwOnError: false });
-      } catch (e) { return math; }
-    });
-    html = html.replace(/\$(.*?)\$/g, (_, math) => {
-      try {
-        return (window as any).katex.renderToString(math, { displayMode: false, throwOnError: false });
-      } catch (e) { return math; }
-    });
-
-    // 2. Render Simple Markdown
-    html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-black text-blue-900">$1</strong>');
-    html = html.replace(/\n/g, '<br />');
-
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
-  };
 
   // Filtering Logic
   const filteredQuestions = useMemo(() => {
@@ -254,14 +230,14 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                       </div>
                    </div>
 
-                   <div className="font-bold text-gray-800 leading-relaxed text-lg mb-6 math-content">
+                   <div className="font-bold text-gray-800 leading-relaxed text-lg mb-6">
                      {formatContent(q.content)}
                    </div>
                    
                    {q.type === QuestionType.MULTIPLE_CHOICE && q.options && (
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
                            {q.options.map((opt, i) => (
-                               <div key={i} className={`text-sm p-4 rounded-2xl border transition-all math-content ${opt === q.correctAnswer ? 'bg-green-50 border-green-200 text-green-700 font-bold ring-2 ring-green-100' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                               <div key={i} className={`text-sm p-4 rounded-2xl border transition-all ${opt === q.correctAnswer ? 'bg-green-50 border-green-200 text-green-700 font-bold ring-2 ring-green-100' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
                                    <div className="flex items-center gap-3">
                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] shrink-0 ${opt === q.correctAnswer ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                                            {String.fromCharCode(65 + i)}
@@ -274,7 +250,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                    )}
 
                    {q.type === QuestionType.ESSAY && (
-                       <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 mb-6 math-content">
+                       <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 mb-6">
                            <p className="text-[10px] font-black text-purple-600 uppercase mb-2">Đáp án mẫu / Gợi ý</p>
                            <div className="text-sm text-purple-800 leading-relaxed italic">
                              {formatContent(q.correctAnswer)}
