@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Chatbot from './components/Chatbot';
-import QuestionGenerator from './components/QuestionGenerator';
+import QuestionGenerator from './components/QuestionGenerator/index'; // Updated import
 import Documents from './components/Documents';
 import GameQuiz from './components/GameQuiz';
 import UserGuide from './components/UserGuide';
@@ -240,7 +240,6 @@ const App: React.FC = () => {
                   <Routes>
                       <Route path="/" element={<Dashboard questions={questions} knowledgeBase={knowledgeBase} />} />
                       <Route path="/documents" element={<Documents onUpdateKnowledgeBase={updateKnowledgeBase} onDeleteDocumentData={deleteKnowledgeByDocId} onNotify={showNotify} />} />
-                      {/* Fixed: Removed onUpdateKnowledgeBase prop which is not defined in QuestionGeneratorProps */}
                       <Route path="/generate" element={<QuestionGenerator folders={folders} onSaveQuestions={(q)=>setQuestions(p=>[...p,...q])} onNotify={showNotify}/>} />
                       <Route path="/bank" element={<QuestionBankManager questions={questions} setQuestions={setQuestions} folders={folders} setFolders={setFolders} showNotify={showNotify} />} />
                       <Route path="/game" element={<GameQuiz questions={questions} folders={folders} />} />

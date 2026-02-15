@@ -65,6 +65,20 @@
         margin-top: 30px;
         text-align: center;
       }
+
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
     </style>
     
     <script type="importmap">
@@ -81,7 +95,8 @@
     "pdfjs-dist/build/pdf.worker": "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs",
     "pdfjs-dist/": "https://esm.sh/pdfjs-dist@^5.4.530/",
     "vite": "https://esm.sh/vite@^7.3.0",
-    "pdfjs-dist": "https://esm.sh/pdfjs-dist@^5.4.530"
+    "pdfjs-dist": "https://esm.sh/pdfjs-dist@^5.4.530",
+    "super-react": "https://esm.sh/super-react@^0.9.1"
   }
 }
 </script>

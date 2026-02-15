@@ -4,6 +4,7 @@
   "description": "Nền tảng học tập Nguồn điện an toàn và môi trường - DHsystem",
   "main": "main.js",
   "scripts": {
+    "dev": "vite",
     "start": "electron .",
     "clean": "rimraf dist dist-electron",
     "build": "npm run clean && vite build && electron-builder --win --x64"

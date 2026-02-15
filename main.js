@@ -1,7 +1,8 @@
-
 const { app, BrowserWindow, session, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// --- GIỮ NGUYÊN HÀM GHI LOG VÀ CÁC IPC HANDLER CŨ ---
 
 function logToFile(msg) {
   const logMsg = `[${new Date().toISOString()}] ${msg}\n`;
@@ -62,22 +63,25 @@ ipcMain.handle('load-database', async () => {
   }
 });
 
+// --- PHẦN SỬA ĐỔI CHÍNH: CẤU HÌNH CREATE WINDOW ---
+
 function createWindow() {
   logToFile("Initializing Main Window...");
   
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    show: false,
+    show: false, // Ẩn cho đến khi load xong để tránh màn hình trắng
     backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      webSecurity: false, // Quan trọng để load file://
+      webSecurity: false, // Quan trọng để load file:// và tài nguyên local
       devTools: true
     }
   });
 
+  // Giữ nguyên cấu hình quyền truy cập Media
   session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
     if (permission === 'media') return true;
     return false;
@@ -88,17 +92,32 @@ function createWindow() {
     callback(false);
   });
 
-  const isPackaged = app.isPackaged;
-  const indexPath = isPackaged 
-    ? path.join(__dirname, 'dist', 'index.html') 
-    : path.join(__dirname, 'index.html');
+  // --- LOGIC LOAD URL ĐÃ ĐƯỢC SỬA LỖI ---
+  if (app.isPackaged) {
+    // 1. Chế độ Production (Đã đóng gói): Load file index.html từ thư mục dist
+    const indexPath = path.join(__dirname, 'dist', 'index.html');
+    logToFile(`PRODUCTION MODE: Loading file from ${indexPath}`);
     
-  logToFile(`Loading interface from: ${indexPath} (Packaged: ${isPackaged})`);
-  
-  mainWindow.loadFile(indexPath).catch(err => {
-    logToFile(`CRITICAL ERROR: Could not load index.html at ${indexPath}. ${err.message}`);
-  });
+    mainWindow.loadFile(indexPath).catch(err => {
+      logToFile(`CRITICAL ERROR: Could not load index.html at ${indexPath}. ${err.message}`);
+    });
+  } else {
+    // 2. Chế độ Development: Load từ Vite Dev Server (http://localhost:3000)
+    // Lưu ý: Đảm bảo bạn đã chạy 'npm run dev' ở một terminal khác
+    const devUrl = 'http://localhost:3000'; 
+    logToFile(`DEVELOPMENT MODE: Loading URL ${devUrl}`);
+    
+    mainWindow.loadURL(devUrl).catch(err => {
+      logToFile(`Error loading Dev URL: ${err.message}. Fallback to file system.`);
+      // Nếu không kết nối được server (quên chạy npm run dev), thử load file gốc
+      mainWindow.loadFile(path.join(__dirname, 'index.html'));
+    });
 
+    // Tự động mở DevTools khi chạy code (F12) để dễ debug
+    mainWindow.webContents.openDevTools();
+  }
+
+  // Hiển thị cửa sổ khi đã sẵn sàng
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     logToFile("Application Window is now visible.");
@@ -106,6 +125,8 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
 }
+
+// --- APP LIFECYCLE (GIỮ NGUYÊN) ---
 
 app.whenReady().then(() => {
   logToFile("System Kernel Ready.");

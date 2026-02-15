@@ -12,6 +12,8 @@ export interface QuestionFolder {
   createdAt: number;
 }
 
+export type BloomLevel = 'Nhandien' | 'Thonghieu' | 'Vandung' | 'Vandungcao';
+
 export interface Question {
   id: string;
   folderId: string;
@@ -87,3 +89,4 @@ export interface NewsArticle {
   date: string;
   source: string;
 }
+

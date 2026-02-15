@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import versionData from '../version.json';
 
 interface VersionData {
   version: string;
@@ -10,21 +9,37 @@ interface VersionData {
 
 const ChangelogModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const data: VersionData = versionData;
+  const [data, setData] = useState<VersionData | null>(null);
 
   useEffect(() => {
-    // Kiểm tra xem người dùng đã xem phiên bản này chưa hoặc vừa mới nâng cấp xong
-    const lastSeenVersion = localStorage.getItem('last_seen_version');
-    const justUpdated = localStorage.getItem('just_updated');
-    
-    if (lastSeenVersion !== data.version || justUpdated === 'true') {
-      setIsOpen(true);
-    }
-  }, [data.version]);
+    // Sử dụng fetch thay vì import trực tiếp để tránh lỗi module specifier JSON
+    const loadVersionData = async () => {
+      try {
+        const response = await fetch('./version.json');
+        if (!response.ok) throw new Error('Không thể tải tệp phiên bản');
+        const json: VersionData = await response.json();
+        setData(json);
+
+        // Kiểm tra xem người dùng đã xem phiên bản này chưa hoặc vừa mới nâng cấp xong
+        const lastSeenVersion = localStorage.getItem('last_seen_version');
+        const justUpdated = localStorage.getItem('just_updated');
+        
+        if (lastSeenVersion !== json.version || justUpdated === 'true') {
+          setIsOpen(true);
+        }
+      } catch (err) {
+        console.warn("[DHSYSTEM] Không thể nạp thông tin phiên bản từ local:", err);
+      }
+    };
+
+    loadVersionData();
+  }, []);
 
   const handleClose = () => {
-    // Lưu lại phiên bản đã xem để không hiện lại lần sau
-    localStorage.setItem('last_seen_version', data.version);
+    if (data) {
+      // Lưu lại phiên bản đã xem để không hiện lại lần sau
+      localStorage.setItem('last_seen_version', data.version);
+    }
     localStorage.removeItem('just_updated');
     setIsOpen(false);
   };
