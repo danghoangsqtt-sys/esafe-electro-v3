@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppSettings, AppVersionInfo } from '../types';
 import { checkAppUpdate } from '../services/updateService';
@@ -14,15 +15,14 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoSave: true,
   ragTopK: 5,
   thinkingBudget: 0,
-  systemExpertise: 'ACADEMIC'
+  systemExpertise: 'ACADEMIC',
+  manualApiKey: ''
 };
 
 const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('app_settings');
-    // Đảm bảo manualApiKey tồn tại trong state
-    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
   const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
@@ -33,23 +33,13 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
   useEffect(() => {
     const kb = JSON.parse(localStorage.getItem('knowledge_base') || '[]');
     setKbSize(kb.length);
-    
-    // Kiểm tra trạng thái Key hệ thống (ưu tiên key người dùng nhập tay)
-    setHasKey(!!settings.manualApiKey || !!process.env.API_KEY);
+    setHasKey(!!settings.manualApiKey);
   }, [settings.manualApiKey]);
-
-  const handleSelectKey = async () => {
-    if ((window as any).aistudio?.openSelectKey) {
-      await (window as any).aistudio.openSelectKey();
-      onNotify("Đã mở trình cấu hình API Key hệ thống.", "info");
-    } else {
-      onNotify("Vui lòng nhập Key trực tiếp vào ô bên dưới.", "info");
-    }
-  };
 
   const saveSettings = () => {
     localStorage.setItem('app_settings', JSON.stringify(settings));
-    onNotify("Đã lưu cấu hình hệ thống E-SafePower.", "success");
+    setHasKey(!!settings.manualApiKey);
+    onNotify("Đã lưu cấu hình hệ thống LMS.", "success");
   };
 
   const handleExportBackup = () => {
@@ -61,13 +51,13 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
         knowledgeBase: JSON.parse(localStorage.getItem('knowledge_base') || '[]'),
         settings: settings,
         exportDate: new Date().toISOString(),
-        system: "E-SafePower DHsystem"
+        system: "LMS Core Management"
       };
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `ESafe_DHSYSTEM_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `LMS_Backup_${new Date().toISOString().split('T')[0]}.json`;
       link.click();
       onNotify("Đã xuất dữ liệu sao lưu thành công.", "success");
     } catch (err) {
@@ -83,8 +73,8 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (!data.system || !data.system.includes("E-SafePower")) {
-          throw new Error("Tệp không đúng định dạng sao lưu của E-SafePower.");
+        if (!data.system || !data.system.includes("LMS")) {
+          throw new Error("Tệp không đúng định dạng sao lưu của Hệ thống LMS.");
         }
 
         if (window.confirm("CẢNH BÁO: Hành động này sẽ thay thế toàn bộ dữ liệu hiện tại bằng dữ liệu từ bản sao lưu. Tiếp tục?")) {
@@ -137,11 +127,11 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm gap-4">
         <div className="flex items-center gap-5">
           <div className="w-16 h-16 bg-blue-600 text-white rounded-3xl flex items-center justify-center text-2xl shadow-2xl shadow-blue-200">
-            <i className="fas fa-shield-bolt"></i>
+            <i className="fas fa-gear"></i>
           </div>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">DHsystem Control Center</h1>
-            <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mt-2">Bảng điều khiển lõi E-SafePower v2.1</p>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Trung tâm Quản trị LMS</h1>
+            <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mt-2">Bảng điều khiển lõi hệ thống LMS v2.1</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -167,29 +157,20 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                         {hasKey ? 'CONNECTED' : 'DISCONNECTED'}
                     </div>
                 </div>
-
-                {/* API KEY INPUT FIELD */}
-                <div className="space-y-4 pt-4">
+                
+                <div className="space-y-4">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <i className="fas fa-key text-blue-500"></i> Gemini API Key của bạn
+                        <i className="fas fa-key text-blue-500"></i> Google Gemini API Key
                     </label>
-                    <div className="flex gap-3">
-                        <input 
-                            type="password" 
-                            value={settings.manualApiKey || ''}
-                            onChange={e => setSettings({...settings, manualApiKey: e.target.value})}
-                            placeholder="Dán API Key (AIza...) tại đây"
-                            className="flex-1 p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                        />
-                        <button 
-                            onClick={handleSelectKey}
-                            className="px-6 py-2 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase hover:bg-slate-200 transition"
-                        >
-                            AI Studio
-                        </button>
-                    </div>
+                    <input 
+                        type="password"
+                        value={settings.manualApiKey}
+                        onChange={e => setSettings({...settings, manualApiKey: e.target.value})}
+                        placeholder="Nhập API Key của bạn tại đây..."
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                     <p className="text-[10px] text-slate-400 italic">
-                        Lưu ý: API Key của bạn được lưu cục bộ trên trình duyệt/máy tính này, không gửi về máy chủ DHsystem.
+                        Lưu ý: API Key được lưu cục bộ trên trình duyệt của bạn. Bạn có thể lấy key tại <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 underline">Google AI Studio</a>.
                     </p>
                 </div>
             </div>
@@ -207,7 +188,7 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                         >
                             <option value="gemini-3-flash-preview">Gemini 3 Flash (Tối ưu nhất)</option>
                             <option value="gemini-3-pro-preview">Gemini 3 Pro (Phân tích sâu)</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ổn định)</option>
+                            <option value="gemini-flash-lite-latest">Gemini Flash Lite</option>
                         </select>
                     </div>
 
@@ -221,8 +202,8 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
                             className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-700 outline-none"
                         >
                             <option value="ACADEMIC">Hàn lâm / Giảng thuật</option>
-                            <option value="FIELD_EXPERT">Kỹ sư hiện trường</option>
-                            <option value="STUDENT_ASSISTANT">Trợ lý ôn tập</option>
+                            <option value="FIELD_EXPERT">Chuyên gia thực tế</option>
+                            <option value="STUDENT_ASSISTANT">Trợ lý học tập</option>
                         </select>
                     </div>
                 </div>
@@ -243,7 +224,7 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
 
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tri thức RAG (Top-K Retrival)</label>
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tri thức RAG (Top-K Retrieval)</label>
                            <span className="font-black text-blue-600 text-sm">{settings.ragTopK} đoạn</span>
                         </div>
                         <input 

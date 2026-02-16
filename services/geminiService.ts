@@ -1,5 +1,5 @@
 
-
+// @google/genai initialization and generation rules followed.
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, QuestionType, VectorChunk, AppSettings } from "../types";
 import { findRelevantChunks } from "./documentProcessor";
@@ -12,7 +12,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoSave: true,
   ragTopK: 5, 
   thinkingBudget: 0, 
-  systemExpertise: 'ACADEMIC'
+  systemExpertise: 'ACADEMIC',
+  manualApiKey: ''
 };
 
 const getSettings = (): AppSettings => {
@@ -21,15 +22,15 @@ const getSettings = (): AppSettings => {
 };
 
 /**
- * Lấy GoogleGenAI instance sử dụng API Key từ biến môi trường process.env.API_KEY.
+ * Lấy GoogleGenAI instance sử dụng API Key từ localStorage.
  */
 const getAI = () => {
   const settings = getSettings();
-  // Ưu tiên lấy manualApiKey từ Settings, sau đó mới đến biến môi trường
-  const apiKey = (settings as any).manualApiKey || process.env.API_KEY || "";
+  const apiKey = settings.manualApiKey;
   
   if (!apiKey) {
-    console.error("Gemini API Key không tồn tại!");
+    console.error("[DHSYSTEM-AI] Missing API Key. Please configure it in Settings.");
+    throw new Error("Vui lòng nhập API Key trong phần Cài đặt để sử dụng tính năng này.");
   }
   
   return new GoogleGenAI({ apiKey });

@@ -2,18 +2,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Chatbot from './components/Chatbot';
-import QuestionGenerator from './components/QuestionGenerator/index'; // Updated import
+import QuestionGenerator from './components/QuestionGenerator/index'; 
 import Documents from './components/Documents';
 import GameQuiz from './components/GameQuiz';
 import UserGuide from './components/UserGuide';
 import Settings from './components/Settings';
 import QuestionBankManager from './components/QuestionBankManager';
 import ChangelogModal from './components/ChangelogModal';
-import { Question, VectorChunk, QuestionFolder } from './types';
+import NewsSection from './components/NewsSection';
+import { Question, VectorChunk, QuestionFolder, Exam } from './types';
 
-// Electron integration
-const isElectron = navigator.userAgent.toLowerCase().includes(' electron/');
-const ipcRenderer = isElectron ? (window as any).require('electron').ipcRenderer : null;
+// Sử dụng Window augmentation từ types.ts để truy cập require một cách an toàn
+const ipcRenderer = typeof window !== 'undefined' && window.require 
+  ? window.require('electron').ipcRenderer 
+  : null;
 
 const SidebarLink = ({ to, icon, label }: { to: string, icon: string, label: string }) => {
   const location = useLocation();
@@ -33,21 +35,21 @@ const SidebarLink = ({ to, icon, label }: { to: string, icon: string, label: str
   );
 };
 
-const Dashboard = ({ questions, knowledgeBase }: any) => {
+const Dashboard = ({ questions, knowledgeBase, exams }: any) => {
     return (
         <div className="p-8 space-y-12 animate-fade-in max-w-7xl mx-auto pb-20">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 bg-white p-12 rounded-[3.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
                 <div className="space-y-4 relative z-10">
-                  <div className="flex items-center gap-3 text-green-600 font-black text-[11px] uppercase tracking-[0.3em]">
-                    <i className="fas fa-leaf animate-bounce"></i>
-                    Nền tảng học tập xanh & an toàn
+                  <div className="flex items-center gap-3 text-blue-600 font-black text-[11px] uppercase tracking-[0.3em]">
+                    <i className="fas fa-graduation-cap animate-bounce"></i>
+                    Nền tảng Quản lý Học tập & Thi cử Toàn diện
                   </div>
                   <h1 className="text-6xl font-black text-slate-900 tracking-tighter leading-none">
-                    E-SafePower <br/> <span className="text-blue-600">Learning Center</span>
+                    LMS Core <br/> <span className="text-blue-600">Learning Center</span>
                   </h1>
                   <p className="text-slate-500 text-xl font-medium max-w-xl">
-                    Chuyên sâu về Nguồn điện an toàn, năng lượng tái tạo và quản lý tác động môi trường.
+                    Hệ thống thông minh hỗ trợ quản lý học liệu, ngân hàng câu hỏi và tổ chức kiểm tra đa môn học.
                   </p>
                 </div>
                 <div className="flex flex-col gap-4 relative z-10">
@@ -61,37 +63,14 @@ const Dashboard = ({ questions, knowledgeBase }: any) => {
             </header>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                <StatCard icon="fa-battery-full" color="blue" label="Hệ thống lưu trữ" value={questions.length} unit="Câu hỏi" />
-                <StatCard icon="fa-solar-panel" color="green" label="Phân đoạn tri thức" value={knowledgeBase.length} unit="Mẩu tin" />
-                <StatCard icon="fa-shield-halved" color="orange" label="Chuẩn an toàn" value={JSON.parse(localStorage.getItem('question_folders') || '[]').length} unit="Chuyên đề" />
+                <StatCard icon="fa-database" color="blue" label="Kho câu hỏi" value={questions.length} unit="Câu hỏi" />
+                <StatCard icon="fa-file-invoice" color="indigo" label="Ngân hàng đề" value={exams?.length || 0} unit="Đề thi" />
+                <StatCard icon="fa-layer-group" color="orange" label="Chuyên đề học tập" value={JSON.parse(localStorage.getItem('question_folders') || '[]').length} unit="Chủ đề" />
                 <StatCard icon="fa-file-pdf" color="purple" label="Kho giáo trình" value={JSON.parse(localStorage.getItem('elearning_docs') || '[]').length} unit="Tài liệu" />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-gradient-to-br from-blue-600 to-indigo-800 p-12 rounded-[3.5rem] text-white relative overflow-hidden shadow-2xl">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-                    <h3 className="text-2xl font-black mb-4 flex items-center gap-3">
-                        <i className="fas fa-brain-circuit text-yellow-400"></i> Trí tuệ AI RAG
-                    </h3>
-                    <p className="text-blue-100 font-medium leading-relaxed mb-8">
-                        AI đã được nạp tri thức chuyên môn từ thư viện giáo trình của bạn. Đặt câu hỏi về TCVN, IEC hoặc công nghệ PV để nhận phản hồi chính xác.
-                    </p>
-                    <div className="flex gap-4">
-                        <div className="bg-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase border border-white/10">Grounding Google Search</div>
-                        <div className="bg-white/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase border border-white/10">Voice Interaction</div>
-                    </div>
-                </div>
-
-                <div className="bg-white p-12 rounded-[3.5rem] border border-slate-100 shadow-sm">
-                    <h3 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                        <i className="fas fa-graduation-cap text-green-500"></i> Lộ trình học tập
-                    </h3>
-                    <div className="space-y-4">
-                        <StudyItem icon="fa-plug" title="An toàn điện cơ bản" status="Hoàn thành" progress={100} />
-                        <StudyItem icon="fa-sun" title="Năng lượng mặt trời & PV" status="Đang diễn ra" progress={65} />
-                        <StudyItem icon="fa-recycle" title="Quản lý chất thải điện tử" status="Chờ bắt đầu" progress={0} />
-                    </div>
-                </div>
+            <div className="mt-10">
+                <NewsSection />
             </div>
         </div>
     );
@@ -110,27 +89,11 @@ const StatCard = ({ icon, color, label, value, unit }: any) => (
     </div>
 );
 
-const StudyItem = ({ icon, title, status, progress }: any) => (
-    <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400">
-            <i className={`fas ${icon}`}></i>
-        </div>
-        <div className="flex-1">
-            <div className="flex justify-between items-center mb-1">
-                <p className="text-sm font-black text-slate-800">{title}</p>
-                <span className="text-[9px] font-black uppercase text-blue-600">{status}</span>
-            </div>
-            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 transition-all duration-1000" style={{ width: `${progress}%` }}></div>
-            </div>
-        </div>
-    </div>
-);
-
 const App: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [folders, setFolders] = useState<QuestionFolder[]>([{"id":"default","name":"Mặc định","createdAt":0}]);
   const [knowledgeBase, setKnowledgeBase] = useState<VectorChunk[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [notifications, setNotifications] = useState<{ id: number, message: string, type: string }[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
@@ -143,12 +106,14 @@ const App: React.FC = () => {
             setQuestions(db.questions || []);
             setFolders(db.folders || [{"id":"default","name":"Mặc định","createdAt":0}]);
             setKnowledgeBase(db.knowledgeBase || []);
+            setExams(db.exams || []);
           }
         } catch (e) { console.error(e); }
       } else {
         setQuestions(JSON.parse(localStorage.getItem('questions') || '[]'));
         setFolders(JSON.parse(localStorage.getItem('question_folders') || '[{"id":"default","name":"Mặc định","createdAt":0}]'));
         setKnowledgeBase(JSON.parse(localStorage.getItem('knowledge_base') || '[]'));
+        setExams(JSON.parse(localStorage.getItem('exams') || '[]'));
       }
       setIsDataLoaded(true);
     };
@@ -160,10 +125,12 @@ const App: React.FC = () => {
     localStorage.setItem('questions', JSON.stringify(questions));
     localStorage.setItem('question_folders', JSON.stringify(folders));
     localStorage.setItem('knowledge_base', JSON.stringify(knowledgeBase));
+    localStorage.setItem('exams', JSON.stringify(exams));
+    
     if (ipcRenderer) {
-      ipcRenderer.invoke('save-database', { questions, folders, knowledgeBase, lastSync: Date.now() });
+      ipcRenderer.invoke('save-database', { questions, folders, knowledgeBase, exams, lastSync: Date.now() });
     }
-  }, [questions, folders, knowledgeBase, isDataLoaded]);
+  }, [questions, folders, knowledgeBase, exams, isDataLoaded]);
 
   const showNotify = (message: string, type: 'success' | 'error' | 'info' | 'warning') => {
     const id = Date.now();
@@ -199,11 +166,11 @@ const App: React.FC = () => {
           <div className="p-10 pb-6">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-[1.8rem] flex items-center justify-center text-2xl shadow-xl shadow-blue-500/30 transform -rotate-3">
-                <i className="fas fa-shield-bolt"></i>
+                <i className="fas fa-graduation-cap"></i>
               </div>
               <div className="flex flex-col">
-                <span className="text-2xl font-black tracking-tighter leading-none text-slate-900">E-Safe</span>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">DHsystem v2.1</span>
+                <span className="text-2xl font-black tracking-tighter leading-none text-slate-900">LMS Core</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Version 2.1</span>
               </div>
             </div>
           </div>
@@ -225,7 +192,7 @@ const App: React.FC = () => {
 
           <div className="p-10 border-t border-slate-50">
              <div className="bg-slate-50 p-4 rounded-2xl text-[9px] font-black text-slate-400 text-center uppercase tracking-[0.3em]">
-                Secure Learning Environment
+                Standard LMS Environment
              </div>
           </div>
         </aside>
@@ -238,10 +205,10 @@ const App: React.FC = () => {
             ) : (
               <div className="flex-1 overflow-auto custom-scrollbar">
                   <Routes>
-                      <Route path="/" element={<Dashboard questions={questions} knowledgeBase={knowledgeBase} />} />
+                      <Route path="/" element={<Dashboard questions={questions} knowledgeBase={knowledgeBase} exams={exams} />} />
                       <Route path="/documents" element={<Documents onUpdateKnowledgeBase={updateKnowledgeBase} onDeleteDocumentData={deleteKnowledgeByDocId} onNotify={showNotify} />} />
                       <Route path="/generate" element={<QuestionGenerator folders={folders} onSaveQuestions={(q)=>setQuestions(p=>[...p,...q])} onNotify={showNotify}/>} />
-                      <Route path="/bank" element={<QuestionBankManager questions={questions} setQuestions={setQuestions} folders={folders} setFolders={setFolders} showNotify={showNotify} />} />
+                      <Route path="/bank" element={<QuestionBankManager questions={questions} setQuestions={setQuestions} folders={folders} setFolders={setFolders} exams={exams} setExams={setExams} showNotify={showNotify} />} />
                       <Route path="/game" element={<GameQuiz questions={questions} folders={folders} />} />
                       <Route path="/guide" element={<UserGuide />} />
                       <Route path="/settings" element={<Settings onNotify={showNotify} />} />

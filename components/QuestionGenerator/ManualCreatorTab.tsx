@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Question, QuestionType, QuestionFolder } from '../../types';
 
 interface ManualCreatorTabProps {
@@ -31,14 +31,22 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
     bloomLevel: 'Nhận biết',
     category: 'An toàn điện',
     folderId: selectedFolderId,
-    image: '' // Chuỗi Base64 ảnh minh họa
+    image: '' 
   });
+
+  // Sử dụng index để quản lý đáp án đúng trong UI nhằm tránh lỗi khi nội dung các phương án trùng nhau (vd: cùng để trống)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  // Cập nhật folderId khi prop selectedFolderId thay đổi từ parent
+  useEffect(() => {
+    setManualQ(prev => ({ ...prev, folderId: selectedFolderId }));
+  }, [selectedFolderId]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = error => reject(error);
     });
   };
@@ -60,7 +68,7 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
         const base64 = await fileToBase64(file);
         setManualQ(prev => ({ 
             ...prev, 
-            image: `data:${file.type};base64,${base64}` 
+            image: base64 
         }));
         onNotify("Đã đính kèm ảnh minh họa cho câu hỏi.", "success");
     } catch (err) {
@@ -79,15 +87,20 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
 
   const handleAddManual = () => {
     if (!manualQ.content.trim()) return onNotify("Nội dung câu hỏi không được để trống", "warning");
+    
+    let finalCorrectAnswer = manualQ.correctAnswer;
+
     if (manualQ.type === QuestionType.MULTIPLE_CHOICE) {
       if (manualQ.options.some(opt => !opt.trim())) return onNotify("Vui lòng nhập đầy đủ các phương án", "warning");
-      if (!manualQ.correctAnswer) return onNotify("Vui lòng chọn đáp án đúng", "warning");
+      if (selectedIndex === null) return onNotify("Vui lòng chọn đáp án đúng", "warning");
+      finalCorrectAnswer = manualQ.options[selectedIndex];
     } else {
       if (!manualQ.correctAnswer.trim()) return onNotify("Vui lòng nhập đáp án chuẩn cho câu hỏi tự luận", "warning");
     }
 
     const newQuestion: Question = {
       ...manualQ,
+      correctAnswer: finalCorrectAnswer,
       id: Math.random().toString(36).substr(2, 9),
       createdAt: Date.now(),
       options: manualQ.type === QuestionType.MULTIPLE_CHOICE ? manualQ.options : undefined
@@ -104,11 +117,27 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
         options: ['', '', '', ''],
         image: '' 
     });
+    setSelectedIndex(null);
     onNotify("Đã thêm câu hỏi vào ngân hàng đề.", "success");
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
+       {/* Folder Selection Dropdown Added at the start of the form */}
+       <div className="space-y-2">
+          <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Thư mục lưu trữ câu hỏi này</label>
+          <select 
+            value={manualQ.folderId} 
+            onChange={e => setManualQ({...manualQ, folderId: e.target.value})} 
+            className="w-full p-4 bg-blue-50/50 border border-blue-100 rounded-2xl font-bold text-slate-700 focus:bg-white outline-none transition-all"
+          >
+            <option value="default">--- Chọn thư mục lưu (Mặc định) ---</option>
+            {folders.filter(f => f.id !== 'default').map(f => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+       </div>
+
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nội dung câu hỏi & Ảnh minh họa</label>
@@ -128,7 +157,7 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
                         </div>
                         <div className="flex-1">
                             <p className="text-[10px] font-black text-blue-600 uppercase tracking-tight">Ảnh đính kèm</p>
-                            <p className="text-[9px] text-gray-400 leading-tight">Ảnh này sẽ hiển thị ngay dưới nội dung câu hỏi trong các chế độ chơi.</p>
+                            <p className="text-[9px] text-gray-400 leading-tight">Ảnh này sẽ hiển thị ngay dưới nội dung câu hỏi.</p>
                         </div>
                         <button 
                             onClick={handleRemoveImage}
@@ -149,10 +178,6 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
                    />
                 </label>
              </div>
-             <p className="text-[10px] text-gray-400 italic px-4 flex items-center gap-2">
-                 <i className="fas fa-info-circle text-blue-400"></i>
-                 Chọn biểu tượng ảnh để đính kèm sơ đồ mạch điện, biểu đồ hoặc hình ảnh minh họa cho câu hỏi.
-             </p>
           </div>
           
           <div className="space-y-6">
@@ -185,13 +210,18 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
                           <input 
                             type="text" 
                             value={opt} 
-                            onChange={e => { const n = [...manualQ.options]; n[i] = e.target.value; setManualQ({...manualQ, options: n}); }} 
+                            onChange={e => { 
+                                const n = [...manualQ.options]; 
+                                n[i] = e.target.value; 
+                                setManualQ({...manualQ, options: n}); 
+                            }} 
                             placeholder={`Phương án ${String.fromCharCode(65+i)}`} 
                             className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-blue-500 text-sm font-medium shadow-sm transition-all" 
                           />
                           <button 
-                            onClick={() => setManualQ({...manualQ, correctAnswer: opt})} 
-                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${manualQ.correctAnswer === opt && opt !== '' ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-gray-300 border border-gray-100 hover:border-blue-300'}`}
+                            type="button"
+                            onClick={() => setSelectedIndex(i)} 
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${selectedIndex === i ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-gray-300 border border-gray-100 hover:border-blue-300'}`}
                           >
                             <i className="fas fa-check text-xs"></i>
                           </button>
@@ -210,6 +240,17 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
                    />
                 </div>
              )}
+
+             <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Giải thích / Ghi chú (Optional)</label>
+                <input 
+                  type="text" 
+                  value={manualQ.explanation} 
+                  onChange={e => setManualQ({...manualQ, explanation: e.target.value})} 
+                  placeholder="Giải thích lý do chọn đáp án này hoặc nguồn trích dẫn..." 
+                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:border-blue-500 text-sm font-medium" 
+                />
+             </div>
 
              <button 
                onClick={handleAddManual} 

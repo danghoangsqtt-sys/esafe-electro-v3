@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Question, QuestionType } from '../../types';
 import { formatContent } from '../../utils/textFormatter';
 import SummaryReview from './shared/SummaryReview';
-import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+import { useSpeechRecognition } from '../../hook/useSpeechRecognition';
 
 interface TimedChallengeGameProps {
   questions: Question[];

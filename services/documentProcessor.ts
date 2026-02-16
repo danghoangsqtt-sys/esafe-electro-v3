@@ -1,5 +1,5 @@
 
-
+// @google/genai initialization rules followed: use process.env.API_KEY.
 import { GoogleGenAI } from "@google/genai";
 import { VectorChunk, PdfMetadata } from "../types";
 import * as pdfjsLib from "pdfjs-dist";
@@ -14,6 +14,18 @@ const parsePdfDate = (dateStr: string | undefined): string => {
     return `${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)}`;
   }
   return dateStr;
+};
+
+/**
+ * Lấy API Key từ localStorage
+ */
+const getApiKey = (): string => {
+  const saved = localStorage.getItem('app_settings');
+  if (saved) {
+    const settings = JSON.parse(saved);
+    return settings.manualApiKey || "";
+  }
+  return "";
 };
 
 export const extractDataFromPDF = async (fileOrUrl: File | string): Promise<{ text: string; metadata: PdfMetadata }> => {
@@ -105,9 +117,10 @@ export const embedChunks = async (
   textChunks: string[],
   onProgress?: (percent: number) => void
 ): Promise<VectorChunk[]> => {
-  const savedSettings = localStorage.getItem('app_settings');
-  const manualApiKey = savedSettings ? JSON.parse(savedSettings).manualApiKey : null;
-  const ai = new GoogleGenAI({ apiKey: manualApiKey || process.env.API_KEY || "" });
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Vui lòng nhập API Key trong phần Cài đặt.");
+  
+  const ai = new GoogleGenAI({ apiKey });
   const vectorChunks: VectorChunk[] = [];
 
   for (let i = 0; i < textChunks.length; i++) {
@@ -153,9 +166,11 @@ export const findRelevantChunks = async (
   topK: number = 5
 ): Promise<VectorChunk[]> => {
   if (knowledgeBase.length === 0) return [];
-  const savedSettings = localStorage.getItem('app_settings');
-  const manualApiKey = savedSettings ? JSON.parse(savedSettings).manualApiKey : null;
-  const ai = new GoogleGenAI({ apiKey: manualApiKey || process.env.API_KEY || "" });
+  
+  const apiKey = getApiKey();
+  if (!apiKey) return [];
+  
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.embedContent({

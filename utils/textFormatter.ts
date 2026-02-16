@@ -1,5 +1,16 @@
-
 import React from 'react';
+
+/**
+ * Hàm sanitize cơ bản để loại bỏ các script và attribute nguy hiểm mà không cần thư viện bên ngoài.
+ * Đảm bảo các thẻ HTML sinh ra từ regex (strong, li, br) và KaTeX được giữ lại nhưng script/iframe bị loại bỏ.
+ */
+const sanitizeHTML = (html: string): string => {
+  return html
+    .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, "") // Xóa thẻ script
+    .replace(/<iframe\b[^>]*>([\s\S]*?)<\/iframe>/gim, "") // Xóa thẻ iframe
+    .replace(/on\w+="[^"]*"/gim, "") // Xóa các event attributes như onclick, onload
+    .replace(/javascript:[^"]*/gim, ""); // Xóa javascript: pseudo-protocol
+};
 
 /**
  * Utility để format văn bản hỗ trợ Markdown cơ bản và KaTeX (Toán học/Điện học).
@@ -33,7 +44,7 @@ export const formatContent = (text: string): React.ReactNode => {
       const cleanMath = math.replace(/<br \/>/g, '\n');
       return (window as any).katex.renderToString(cleanMath, { 
         displayMode: false, 
-        throwOnError: false,
+        throwOnError: false, 
         strict: false 
       });
     } catch (e) {
@@ -47,8 +58,11 @@ export const formatContent = (text: string): React.ReactNode => {
   // 5. Markdown cơ bản: Lists
   html = html.replace(/^\s*-\s+(.*)$/gm, '<li class="ml-4 list-disc mb-1">$1</li>');
 
+  // Áp dụng sanitize trước khi nạp vào dangerouslySetInnerHTML
+  const sanitizedHtml = sanitizeHTML(html);
+
   return React.createElement('div', {
     className: 'math-content break-words',
-    dangerouslySetInnerHTML: { __html: html }
+    dangerouslySetInnerHTML: { __html: sanitizedHtml }
   });
 };

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Question, QuestionFolder, QuestionType } from '../types';
+import { Question, QuestionFolder, QuestionType, Exam } from '../types';
 import { formatContent } from '../utils/textFormatter';
 import ExamCreator from './ExamCreator';
 
@@ -9,12 +9,23 @@ interface QuestionBankManagerProps {
   setQuestions: React.Dispatch<React.SetStateAction<Question[]>>;
   folders: QuestionFolder[];
   setFolders: React.Dispatch<React.SetStateAction<QuestionFolder[]>>;
+  exams: Exam[];
+  setExams: React.Dispatch<React.SetStateAction<Exam[]>>;
   showNotify: (message: string, type: any) => void;
 }
 
 const BLOOM_LEVELS = ['Nhận biết', 'Thông hiểu', 'Vận dụng', 'Phân tích', 'Đánh giá', 'Sáng tạo'];
 
-const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, setQuestions, folders, setFolders, showNotify }) => {
+const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ 
+  questions, 
+  setQuestions, 
+  folders, 
+  setFolders, 
+  exams = [], 
+  setExams, 
+  showNotify 
+}) => {
+  const [managerTab, setManagerTab] = useState<'QUESTIONS' | 'EXAMS'>('QUESTIONS');
   const [selectedFolderId, setSelectedFolderId] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<QuestionType | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
@@ -23,14 +34,14 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
   const [newFolderName, setNewFolderName] = useState('');
 
   // Exam Selection States
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
   const [isCreatingExam, setIsCreatingExam] = useState(false);
+  const [viewingExam, setViewingExam] = useState<Exam | null>(null);
 
   // Modals States
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [viewingQuestion, setViewingQuestion] = useState<Question | null>(null);
 
-  // Filtering Logic
+  // Filtering Logic Questions
   const filteredQuestions = useMemo(() => {
     return questions.filter(q => {
       const matchFolder = selectedFolderId === 'all' || q.folderId === selectedFolderId;
@@ -41,20 +52,12 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
     });
   }, [questions, selectedFolderId, activeTab, search, bloomFilter]);
 
-  const toggleSelectAll = () => {
-    if (selectedQuestionIds.size === filteredQuestions.length) {
-      setSelectedQuestionIds(new Set());
-    } else {
-      setSelectedQuestionIds(new Set(filteredQuestions.map(q => q.id)));
-    }
-  };
-
-  const toggleSelectQuestion = (id: string) => {
-    const next = new Set(selectedQuestionIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedQuestionIds(next);
-  };
+  // Filtering Logic Exams
+  const filteredExams = useMemo(() => {
+    return (exams || []).filter(e => 
+      e.title.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [exams, search]);
 
   const handleAddFolder = () => {
     if (!newFolderName.trim()) return;
@@ -84,6 +87,13 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
           setQuestions(prev => prev.filter(q => q.id !== id));
           showNotify("Đã xóa câu hỏi.", "info");
       }
+  };
+
+  const deleteExam = (id: string) => {
+    if (window.confirm("Xóa đề thi này khỏi ngân hàng?")) {
+        setExams(prev => prev.filter(e => e.id !== id));
+        showNotify("Đã xóa đề thi thành công.", "info");
+    }
   };
 
   const handleUpdateQuestion = () => {
@@ -118,74 +128,124 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
   };
 
   const currentFolder = folders.find(f => f.id === selectedFolderId);
-  const selectedQuestionsForExam = questions.filter(q => selectedQuestionIds.has(q.id));
 
-  if (isCreatingExam) {
-    return <ExamCreator questions={selectedQuestionsForExam} onBack={() => setIsCreatingExam(false)} />;
+  const handleSaveExam = (exam: Exam) => {
+    setExams(prev => [...prev, exam]);
+    setIsCreatingExam(false);
+    showNotify("Đã lưu đề thi vào ngân hàng đề.", "success");
+  };
+
+  // Hiển thị ExamCreator ở chế độ Tạo mới hoặc Xem lại
+  if (isCreatingExam || viewingExam) {
+    return <ExamCreator 
+      questions={questions} 
+      viewExam={viewingExam || undefined}
+      onBack={() => { setIsCreatingExam(false); setViewingExam(null); }} 
+      onSaveExam={handleSaveExam}
+    />;
   }
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-white overflow-hidden animate-fade-in font-inter relative">
       {/* Sidebar - Folders */}
       <aside className="w-full md:w-72 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
-        <div className="p-6 border-b border-slate-200 bg-white flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <i className="fas fa-database text-blue-600"></i>
-            <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">Kho học liệu</h3>
+        <div className="p-6 border-b border-slate-200 bg-white">
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 mb-6">
+            <button 
+              onClick={() => setManagerTab('QUESTIONS')}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${managerTab === 'QUESTIONS' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              Kho Câu Hỏi
+            </button>
+            <button 
+              onClick={() => setManagerTab('EXAMS')}
+              className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${managerTab === 'EXAMS' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              Đề Thi
+            </button>
           </div>
-          <button 
-            onClick={() => setIsAddingFolder(true)}
-            className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition shadow-sm active:scale-90"
-          >
-            <i className="fas fa-plus text-xs"></i>
-          </button>
+          
+          <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                  <i className="fas fa-database text-blue-600"></i>
+                  <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest">
+                    {managerTab === 'QUESTIONS' ? 'Chuyên đề' : 'Lọc đề thi'}
+                  </h3>
+              </div>
+              {managerTab === 'QUESTIONS' && (
+                <button 
+                    onClick={() => setIsAddingFolder(true)}
+                    className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition shadow-sm active:scale-90"
+                >
+                    <i className="fas fa-plus text-xs"></i>
+                </button>
+              )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
-          <button 
-            onClick={() => setSelectedFolderId('all')}
-            className={`w-full text-left px-5 py-4 rounded-2xl font-bold text-sm flex items-center gap-3 transition-all ${selectedFolderId === 'all' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-200/50'}`}
-          >
-            <i className="fas fa-layer-group"></i> Tất cả câu hỏi
-          </button>
-          
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-5 mt-8 mb-3">Chuyên đề bài học</div>
+          {managerTab === 'QUESTIONS' ? (
+            <>
+              <button 
+                onClick={() => setSelectedFolderId('all')}
+                className={`w-full text-left px-5 py-4 rounded-2xl font-bold text-sm flex items-center gap-3 transition-all ${selectedFolderId === 'all' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              >
+                <i className="fas fa-layer-group"></i> Tất cả câu hỏi
+              </button>
+              
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-5 mt-8 mb-3">Phân loại</div>
 
-          {folders.map(f => (
-            <div key={f.id} className="group relative">
-                <button 
-                    onClick={() => setSelectedFolderId(f.id)}
-                    className={`w-full text-left px-5 py-4 rounded-2xl font-bold text-sm flex items-center gap-3 transition-all pr-12 ${selectedFolderId === f.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-200/50'}`}
-                >
-                    <i className={`fas ${selectedFolderId === f.id ? 'fa-folder-open' : 'fa-folder'} ${selectedFolderId === f.id ? 'text-white' : 'text-yellow-500'}`}></i> 
-                    <span className="truncate">{f.name}</span>
-                </button>
-                {f.id !== 'default' && (
+              {folders.map(f => (
+                <div key={f.id} className="group relative">
                     <button 
-                        onClick={() => deleteFolder(f.id, f.name)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl text-slate-400 hover:bg-red-500 hover:text-white transition opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-sm"
+                        onClick={() => setSelectedFolderId(f.id)}
+                        className={`w-full text-left px-5 py-4 rounded-2xl font-bold text-sm flex items-center gap-3 transition-all pr-12 ${selectedFolderId === f.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-200/50'}`}
                     >
-                        <i className="fas fa-trash-alt text-[10px]"></i>
+                        <i className={`fas ${selectedFolderId === f.id ? 'fa-folder-open' : 'fa-folder'} ${selectedFolderId === f.id ? 'text-white' : 'text-yellow-500'}`}></i> 
+                        <span className="truncate">{f.name}</span>
                     </button>
-                )}
-            </div>
-          ))}
+                    {f.id !== 'default' && (
+                        <button 
+                            onClick={() => deleteFolder(f.id, f.name)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl text-slate-400 hover:bg-red-500 hover:text-white transition opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-sm"
+                        >
+                            <i className="fas fa-trash-alt text-[10px]"></i>
+                        </button>
+                    )}
+                </div>
+              ))}
 
-          {isAddingFolder && (
-            <div className="p-4 bg-white rounded-2xl border border-blue-200 mt-2 shadow-xl animate-fade-in-up">
-              <input 
-                autoFocus
-                type="text" 
-                value={newFolderName}
-                onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAddFolder()}
-                placeholder="Tên chuyên đề..."
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none text-sm font-medium focus:border-blue-500 transition-all"
-              />
-              <div className="flex gap-2 mt-3">
-                <button onClick={handleAddFolder} className="flex-1 bg-blue-600 text-white py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">Tạo</button>
-                <button onClick={() => setIsAddingFolder(false)} className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Hủy</button>
+              {isAddingFolder && (
+                <div className="p-4 bg-white rounded-2xl border border-blue-200 mt-2 shadow-xl animate-fade-in-up">
+                  <input 
+                    autoFocus
+                    type="text" 
+                    value={newFolderName}
+                    onChange={e => setNewFolderName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddFolder()}
+                    placeholder="Tên chuyên đề..."
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none text-sm font-medium focus:border-blue-500 transition-all"
+                  />
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={handleAddFolder} className="flex-1 bg-blue-600 text-white py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">Tạo</button>
+                    <button onClick={() => setIsAddingFolder(false)} className="px-4 py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest">Hủy</button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Thống kê</p>
+                <p className="text-xl font-black text-slate-800">{exams.length} <span className="text-xs text-slate-400">Đề thi</span></p>
               </div>
+              <button 
+                onClick={() => setIsCreatingExam(true)}
+                className="w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-blue-600 transition-all shadow-xl shadow-blue-900/10"
+              >
+                <i className="fas fa-plus-circle"></i> Soạn đề thi mới
+              </button>
+              <p className="text-[10px] text-slate-400 font-bold px-4 italic leading-relaxed">Sử dụng công cụ sinh đề tự động bằng ma trận để tạo đề thi nhanh chóng.</p>
             </div>
           )}
         </div>
@@ -198,11 +258,15 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
             <div>
               <nav className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2">
                 <i className="fas fa-home"></i>
-                <span>/ Quản lý học liệu</span>
+                <span>/ Quản lý học liệu / {managerTab === 'QUESTIONS' ? 'Kho câu hỏi' : 'Ngân hàng đề'}</span>
               </nav>
               <h2 className="text-3xl font-black text-slate-900 flex items-center gap-4 tracking-tighter">
-                {selectedFolderId === 'all' ? 'Tổng hợp ngân hàng' : currentFolder?.name}
-                <span className="text-sm font-bold bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full">{filteredQuestions.length}</span>
+                {managerTab === 'QUESTIONS' 
+                  ? (selectedFolderId === 'all' ? 'Tổng hợp ngân hàng' : currentFolder?.name)
+                  : 'Danh sách đề thi đã lưu'}
+                <span className="text-sm font-bold bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full">
+                  {managerTab === 'QUESTIONS' ? filteredQuestions.length : filteredExams.length}
+                </span>
               </h2>
             </div>
 
@@ -211,116 +275,157 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                  <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"></i>
                  <input 
                     type="text" 
-                    placeholder="Tìm theo nội dung..." 
+                    placeholder={managerTab === 'QUESTIONS' ? "Tìm theo nội dung..." : "Tìm tên đề thi..."} 
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     className="pl-12 pr-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white transition-all w-full lg:w-64"
                  />
                </div>
-               <select 
-                value={bloomFilter}
-                onChange={e => setBloomFilter(e.target.value)}
-                className="px-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-600 outline-none hover:bg-white transition cursor-pointer"
-               >
-                 <option value="Tất cả">Cấp độ Bloom</option>
-                 {BLOOM_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-               </select>
+               {managerTab === 'QUESTIONS' && (
+                 <select 
+                  value={bloomFilter}
+                  onChange={e => setBloomFilter(e.target.value)}
+                  className="px-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-600 outline-none hover:bg-white transition cursor-pointer"
+                 >
+                   <option value="Tất cả">Cấp độ Bloom</option>
+                   {BLOOM_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                 </select>
+               )}
             </div>
           </div>
 
-          <div className="flex gap-8 mt-10 border-b border-slate-100 items-center">
-            {['ALL', QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY].map(tab => (
-              <button 
-                  key={tab}
-                  onClick={() => setActiveTab(tab as any)}
-                  className={`pb-4 px-2 text-[11px] font-black uppercase tracking-widest transition-all relative ${activeTab === tab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                  {tab === 'ALL' ? 'Tất cả' : tab === QuestionType.MULTIPLE_CHOICE ? 'Trắc nghiệm' : 'Tự luận'}
-                  {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-1.5 bg-blue-600 rounded-t-full animate-fade-in"></div>}
-              </button>
-            ))}
-            
-            <div className="ml-auto flex items-center gap-3 pb-4">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                    <input 
-                        type="checkbox" 
-                        className="w-4 h-4 rounded-md text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        checked={selectedQuestionIds.size === filteredQuestions.length && filteredQuestions.length > 0}
-                        onChange={toggleSelectAll}
-                    />
-                    <span className="text-[10px] font-black uppercase text-slate-400 group-hover:text-slate-600">Chọn tất cả</span>
-                </label>
+          {managerTab === 'QUESTIONS' && (
+            <div className="flex gap-8 mt-10 border-b border-slate-100 items-center">
+              {['ALL', QuestionType.MULTIPLE_CHOICE, QuestionType.ESSAY].map(tab => (
+                <button 
+                    key={tab}
+                    onClick={() => setActiveTab(tab as any)}
+                    className={`pb-4 px-2 text-[11px] font-black uppercase tracking-widest transition-all relative ${activeTab === tab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                    {tab === 'ALL' ? 'Tất cả' : tab === QuestionType.MULTIPLE_CHOICE ? 'Trắc nghiệm' : 'Tự luận'}
+                    {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-1.5 bg-blue-600 rounded-t-full animate-fade-in"></div>}
+                </button>
+              ))}
             </div>
-          </div>
+          )}
         </header>
 
         {/* List View Container */}
         <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30 custom-scrollbar pb-32">
-          {filteredQuestions.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                <i className="fas fa-folder-open text-7xl mb-6 opacity-20"></i>
-                <p className="font-black text-xs uppercase tracking-[0.3em]">Kho câu hỏi trống</p>
-            </div>
+          {managerTab === 'QUESTIONS' ? (
+            filteredQuestions.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                  <i className="fas fa-folder-open text-7xl mb-6 opacity-20"></i>
+                  <p className="font-black text-xs uppercase tracking-[0.3em]">Kho câu hỏi trống</p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-w-6xl mx-auto">
+                {filteredQuestions.map((q) => (
+                  <div key={q.id} className={`bg-white p-6 rounded-3xl border transition-all group flex items-center gap-6 relative overflow-hidden border-slate-100 shadow-sm hover:shadow-md`}>
+                     <div className={`absolute top-0 left-0 w-2 h-full ${q.type === QuestionType.MULTIPLE_CHOICE ? 'bg-blue-500' : 'bg-purple-500'}`}></div>
+                     
+                     <div className="flex-1 min-w-0">
+                        <div className="font-bold text-slate-800 leading-relaxed text-base line-clamp-2 overflow-hidden mb-2">
+                          {q.content}
+                        </div>
+                        <div className="flex items-center gap-3">
+                           <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-3 py-1 rounded-full uppercase tracking-tighter border border-slate-200">{q.category}</span>
+                           <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border ${q.bloomLevel === 'Sáng tạo' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{q.bloomLevel}</span>
+                           {q.image && <i className="fas fa-image text-orange-400 text-xs" title="Có ảnh minh họa"></i>}
+                        </div>
+                     </div>
+
+                     <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={() => setViewingQuestion(q)} className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center hover:scale-110 active:scale-90 transition shadow-lg"><i className="fas fa-eye text-xs"></i></button>
+                        <button onClick={() => setEditingQuestion(q)} className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white hover:scale-110 active:scale-90 transition"><i className="fas fa-pen text-xs"></i></button>
+                        <button onClick={() => deleteQuestion(q.id)} className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white hover:scale-110 active:scale-90 transition"><i className="fas fa-trash-alt text-xs"></i></button>
+                     </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
-            <div className="space-y-4 max-w-6xl mx-auto">
-              {filteredQuestions.map((q) => (
-                <div key={q.id} className={`bg-white p-6 rounded-3xl border transition-all group flex items-center gap-6 relative overflow-hidden ${selectedQuestionIds.has(q.id) ? 'border-blue-500 ring-2 ring-blue-500/10 shadow-lg' : 'border-slate-100 shadow-sm hover:shadow-md'}`}>
-                   <div className={`absolute top-0 left-0 w-2 h-full ${q.type === QuestionType.MULTIPLE_CHOICE ? 'bg-blue-500' : 'bg-purple-500'}`}></div>
-                   
-                   <div className="flex items-center gap-4 shrink-0">
-                      <input 
-                        type="checkbox" 
-                        className="w-5 h-5 rounded-lg text-blue-600 border-slate-200 focus:ring-blue-500 cursor-pointer"
-                        checked={selectedQuestionIds.has(q.id)}
-                        onChange={() => toggleSelectQuestion(q.id)}
-                      />
-                   </div>
-
-                   <div className="flex-1 min-w-0" onClick={() => toggleSelectQuestion(q.id)}>
-                      <div className="font-bold text-slate-800 leading-relaxed text-base line-clamp-2 overflow-hidden mb-2 cursor-pointer">
-                        {q.content}
+            filteredExams.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                  <i className="fas fa-file-invoice text-7xl mb-6 opacity-20"></i>
+                  <p className="font-black text-xs uppercase tracking-[0.3em]">Ngân hàng đề thi trống</p>
+                  <button onClick={() => setIsCreatingExam(true)} className="mt-6 px-10 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20">Soạn đề thi đầu tiên</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                {filteredExams.map((exam) => (
+                  <div key={exam.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 hover:shadow-xl hover:scale-[1.02] transition-all group relative overflow-hidden flex flex-col h-full">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-sm">
+                        <i className="fas fa-file-lines text-xl"></i>
                       </div>
-                      <div className="flex items-center gap-3">
-                         <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-3 py-1 rounded-full uppercase tracking-tighter border border-slate-200">{q.category}</span>
-                         <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border ${q.bloomLevel === 'Sáng tạo' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>{q.bloomLevel}</span>
-                         {q.image && <i className="fas fa-image text-orange-400 text-xs" title="Có ảnh minh họa"></i>}
-                      </div>
-                   </div>
+                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{new Date(exam.createdAt).toLocaleDateString('vi-VN')}</span>
+                    </div>
+                    
+                    <h4 className="text-xl font-black text-slate-800 leading-tight mb-4 flex-1">
+                      {exam.title}
+                    </h4>
+                    
+                    <div className="flex flex-col gap-3 mb-8">
+                       <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
+                         <i className="fas fa-layer-group w-4 text-center"></i>
+                         <span>{exam.questionIds.length} Câu hỏi</span>
+                       </div>
+                       <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
+                         <i className="fas fa-clock w-4 text-center"></i>
+                         <span>{exam.config?.time || 60} Phút</span>
+                       </div>
+                       <div className="flex items-center gap-3">
+                         <span className="px-3 py-1 bg-indigo-100 text-indigo-600 rounded-full text-[9px] font-black uppercase tracking-widest">
+                            {exam.config?.examCode ? `Mã đề: ${exam.config.examCode}` : 'Chưa gắn mã'}
+                         </span>
+                       </div>
+                    </div>
 
-                   <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => setViewingQuestion(q)} className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center hover:scale-110 active:scale-90 transition shadow-lg"><i className="fas fa-eye text-xs"></i></button>
-                      <button onClick={() => setEditingQuestion(q)} className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white hover:scale-110 active:scale-90 transition"><i className="fas fa-pen text-xs"></i></button>
-                      <button onClick={() => deleteQuestion(q.id)} className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white hover:scale-110 active:scale-90 transition"><i className="fas fa-trash-alt text-xs"></i></button>
-                   </div>
-                </div>
-              ))}
-            </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setViewingExam(exam)}
+                        className="flex-1 py-3.5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-2"
+                      >
+                        <i className="fas fa-eye"></i> Xem/In
+                      </button>
+                      <button 
+                        onClick={() => deleteExam(exam.id)}
+                        className="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                      >
+                        <i className="fas fa-trash-alt text-xs"></i>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
 
-        {/* Floating Action Bar */}
-        {selectedQuestionIds.size > 0 && (
+        {/* Floating Action Bar - Only show in Questions tab for manual management */}
+        {managerTab === 'QUESTIONS' && filteredQuestions.length > 0 && (
             <div className="fixed bottom-10 left-1/2 -translate-x-1/2 md:left-[calc(50%+144px)] z-50 animate-fade-in-up">
                 <div className="bg-slate-900 text-white px-10 py-5 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 flex items-center gap-8 backdrop-blur-md">
                     <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Đã chọn</span>
-                        <span className="text-xl font-black">{selectedQuestionIds.size} <span className="text-xs text-slate-500 font-bold tracking-normal uppercase ml-1">Câu hỏi</span></span>
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Công cụ nhanh</span>
+                        <span className="text-xl font-black">Ngân hàng <span className="text-xs text-slate-500 font-bold tracking-normal uppercase ml-1">Sẵn sàng</span></span>
                     </div>
                     <div className="h-10 w-[1px] bg-white/10"></div>
                     <div className="flex gap-3">
-                        <button onClick={() => setSelectedQuestionIds(new Set())} className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest transition-all border border-white/5">Hủy chọn</button>
                         <button 
                             onClick={() => setIsCreatingExam(true)}
                             className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 hover:bg-blue-500 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
                         >
-                            <i className="fas fa-file-invoice"></i> TẠO ĐỀ THI NGAY
+                            <i className="fas fa-wand-magic-sparkles"></i> SOẠN ĐỀ TỰ ĐỘNG
                         </button>
                     </div>
                 </div>
             </div>
         )}
 
-        {/* Modal: Xem chi tiết câu hỏi */}
+        {/* Modals: Xem/Chỉnh sửa Question */}
         {viewingQuestion && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 md:p-12 bg-slate-950/80 backdrop-blur-md animate-fade-in">
                 <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[4rem] shadow-2xl flex flex-col overflow-hidden border border-white/20 animate-fade-in-up">
@@ -385,7 +490,6 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
             </div>
         )}
 
-        {/* Modal: Chỉnh sửa câu hỏi */}
         {editingQuestion && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-xl animate-fade-in">
                 <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-fade-in-up">
@@ -445,7 +549,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                                 ) : (
                                     <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Đáp án tiêu chuẩn</label><textarea value={editingQuestion.correctAnswer} onChange={e => setEditingQuestion({...editingQuestion, correctAnswer: e.target.value})} className="w-full h-72 p-6 bg-slate-50 border border-slate-200 rounded-[2.5rem] outline-none focus:border-blue-500 font-bold text-slate-800 transition-all shadow-inner focus:bg-white resize-none" placeholder="Nhập đáp án chuẩn chi tiết..." /></div>
                                 )}
-                                <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Ghi chú / Giải thích</label><input type="text" value={editingQuestion.explanation} onChange={e => setEditingQuestion({...editingQuestion, explanation: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-medium text-slate-600 focus:bg-white" placeholder="Ví dụ: Nguồn PV đạt hiệu suất cao nhất khi..." /></div>
+                                <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Ghi chú / Giải thích</label><input type="text" value={editingQuestion.explanation} onChange={e => setEditingQuestion({...editingQuestion, explanation: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-medium text-slate-600 focus:bg-white" placeholder="Ví dụ: Nội dung chương 1 đã nêu..." /></div>
                             </div>
                         </div>
                     </div>

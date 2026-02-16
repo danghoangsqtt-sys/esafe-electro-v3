@@ -4,6 +4,8 @@ export enum QuestionType {
   ESSAY = 'ESSAY',
 }
 
+export type ExamType = 'REGULAR' | '15_MIN' | '45_MIN' | 'MID_TERM' | 'FINAL';
+
 export interface QuestionFolder {
   id: string;
   name: string;
@@ -23,6 +25,15 @@ export interface Question {
   createdAt: number;
   bloomLevel?: string;
   image?: string; // Dữ liệu ảnh dạng Base64 (Duy nhất)
+}
+
+export interface Exam {
+  id: string;
+  title: string;
+  type: ExamType;
+  questionIds: string[]; // Danh sách ID các câu hỏi trong đề
+  createdAt: number;
+  config: any; // Lưu thông tin trường, khoa, thời gian...
 }
 
 export interface PdfMetadata {
@@ -68,6 +79,7 @@ export interface AppSettings {
   thinkingBudget: number; 
   systemExpertise: 'ACADEMIC' | 'FIELD_EXPERT' | 'STUDENT_ASSISTANT';
   debugMode?: boolean;
+  manualApiKey?: string; // Khóa API do người dùng nhập thủ công
 }
 
 export interface AppVersionInfo {
@@ -85,4 +97,13 @@ export interface NewsArticle {
   summary: string;
   date: string;
   source: string;
+}
+
+/**
+ * Augmenting Global Scope for Electron integration
+ */
+declare global {
+  interface Window {
+    require: (module: 'electron' | string) => any;
+  }
 }

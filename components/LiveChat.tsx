@@ -1,5 +1,22 @@
+
+// Fix: Updated model name to gemini-2.5-flash-native-audio-preview-12-2025 as per guidelines.
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+
+// --- AudioWorklet Processor Script ---
+const WORKLET_CODE = `
+class AudioProcessor extends AudioWorkletProcessor {
+  process(inputs, outputs, parameters) {
+    const input = inputs[0];
+    if (input.length > 0) {
+      // Send the first channel data to the main thread
+      this.port.postMessage(input[0]);
+    }
+    return true;
+  }
+}
+registerProcessor('audio-input-processor', AudioProcessor);
+`;
 
 interface LiveChatProps {
   voiceName?: string;
@@ -57,21 +74,6 @@ async function decodeAudioData(
   return buffer;
 }
 
-// AudioWorklet Processor Script as a string to create a Blob URL
-const WORKLET_CODE = `
-class AudioProcessor extends AudioWorkletProcessor {
-  process(inputs, outputs, parameters) {
-    const input = inputs[0];
-    if (input.length > 0) {
-      // Send the first channel data to the main thread
-      this.port.postMessage(input[0]);
-    }
-    return true;
-  }
-}
-registerProcessor('audio-input-processor', AudioProcessor);
-`;
-
 const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -123,8 +125,17 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
     setIsInitializing(true);
 
     try {
-      /* Enforce exclusively using process.env.API_KEY per guidelines */
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      /* Lấy API Key từ localStorage */
+      const saved = localStorage.getItem('app_settings');
+      const apiKey = saved ? JSON.parse(saved).manualApiKey : "";
+      
+      if (!apiKey) {
+        setError("Vui lòng nhập API Key trong phần Cài đặt để sử dụng tính năng này.");
+        setIsInitializing(false);
+        return;
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       
       inputContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -135,9 +146,10 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
       try {
           streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
           console.debug("[DHSYSTEM-DEBUG] Microphone stream acquired.");
-      } catch (mediaErr: any) {
+      } catch (mediaErr: unknown) {
+          const errorMessage = mediaErr instanceof Error ? mediaErr.message : "Vui lòng cấp quyền Microphone.";
           console.error("[DHSYSTEM-DEBUG] Microphone error:", mediaErr);
-          throw new Error("Vui lòng cấp quyền Microphone.");
+          throw new Error(errorMessage);
       }
 
       // Load AudioWorklet
@@ -146,7 +158,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
       await inputContextRef.current.audioWorklet.addModule(workletUrl);
 
       const sessionPromise = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
@@ -166,12 +178,14 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                 const workletNode = new AudioWorkletNode(inputContextRef.current, 'audio-input-processor');
                 workletNodeRef.current = workletNode;
 
-                workletNode.port.onmessage = (event) => {
+                workletNode.port.onmessage = (event: MessageEvent<Float32Array>) => {
                     const inputData = event.data; // Float32Array from channel 0
                     const pcmBlob = createBlob(inputData);
                     /* Initiate sendRealtimeInput after live.connect resolves per guidelines */
                     sessionPromise.then(session => {
                         session.sendRealtimeInput({ media: pcmBlob });
+                    }).catch(err => {
+                        console.error("[DHSYSTEM-DEBUG] Error sending realtime input:", err);
                     });
                 };
 
@@ -201,11 +215,13 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                 }
             },
             onclose: () => {
+                console.debug("[DHSYSTEM-DEBUG] Live session connection CLOSED.");
                 setIsConnected(false);
                 setIsInitializing(false);
             },
-            onerror: async (err: any) => {
-                setError("Lỗi kết nối AI. Vui lòng kiểm tra lại cấu hình hệ thống.");
+            onerror: async (err: unknown) => {
+                console.error("[DHSYSTEM-DEBUG] Live connection error callback:", err);
+                setError("Lỗi kết nối AI. Vui lòng kiểm tra lại cấu hình hệ thống hoặc kết nối mạng.");
                 setIsConnected(false);
                 stopSession();
             }
@@ -213,8 +229,10 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
       });
       sessionRef.current = sessionPromise;
 
-    } catch (err: any) {
-        setError(err.message || "Lỗi khởi tạo hội thoại.");
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Lỗi khởi tạo hội thoại.";
+        console.error("[DHSYSTEM-DEBUG] Failed to start session:", err);
+        setError(errorMessage);
         setIsInitializing(false);
         stopSession();
     }

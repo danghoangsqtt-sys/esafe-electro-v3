@@ -4,7 +4,7 @@ import { Question } from '../../types';
 import { evaluateOralAnswer } from '../../services/geminiService';
 import { formatContent } from '../../utils/textFormatter';
 import SummaryReview from './shared/SummaryReview';
-import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+import { useSpeechRecognition } from '../../hook/useSpeechRecognition';
 
 interface OralGameProps {
   questions: Question[];
