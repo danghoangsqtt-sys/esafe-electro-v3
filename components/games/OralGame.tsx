@@ -92,11 +92,11 @@ const OralGame: React.FC<OralGameProps> = ({ questions, onExit }) => {
             {formatContent(currentQ.content)}
           </div>
           
-          {/* Ảnh minh họa chuyên môn */}
-          {(currentQ.image || currentQ.imageUrl) && (
+          {/* Ảnh minh họa chuyên môn - Fix: use currentQ.image instead of imageUrl */}
+          {currentQ.image && (
             <div className="mb-8 flex justify-center animate-fade-in-up">
                 <img 
-                    src={currentQ.image || currentQ.imageUrl} 
+                    src={currentQ.image} 
                     alt="Sơ đồ kỹ thuật" 
                     className="max-h-64 object-contain rounded-3xl shadow-2xl border border-white/10 bg-slate-900 mx-auto my-4 transition-transform group-hover:scale-105 duration-700" 
                 />

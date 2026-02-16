@@ -96,11 +96,11 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
             {formatContent(currentQ.content)}
           </div>
           
-          {/* Hiển thị ảnh minh họa */}
-          {(currentQ.image || currentQ.imageUrl) && (
+          {/* Hiển thị ảnh minh họa - Fix: use currentQ.image instead of imageUrl */}
+          {currentQ.image && (
             <div className="mt-8 flex justify-center">
                 <img 
-                    src={currentQ.image || currentQ.imageUrl} 
+                    src={currentQ.image} 
                     alt="Minh họa câu hỏi" 
                     className="max-h-64 object-contain rounded-xl mx-auto my-4 shadow-md border border-white/10" 
                 />

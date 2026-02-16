@@ -46,12 +46,12 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
     setFolders(prev => [...prev, newFolder]);
     setNewFolderName('');
     setIsAddingFolder(false);
-    showNotify(`Đã tạo thư mục bài: "${newFolderName}"`, "success");
+    showNotify(`Đã tạo thư mục chuyên đề: "${newFolderName}"`, "success");
   };
 
   const deleteFolder = (id: string, name: string) => {
       if (id === 'default') return showNotify("Không thể xóa thư mục hệ thống", "warning");
-      if (window.confirm(`Xóa thư mục "${name}"? Toàn bộ câu hỏi bên trong sẽ bị xóa khỏi ngân hàng đề.`)) {
+      if (window.confirm(`Xóa thư mục "${name}"? Toàn bộ câu hỏi bên trong sẽ bị xóa.`)) {
           setFolders(prev => prev.filter(f => f.id !== id));
           setQuestions(prev => prev.filter(q => q.folderId !== id));
           if (selectedFolderId === id) setSelectedFolderId('all');
@@ -70,14 +70,39 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
       if (!editingQuestion) return;
       setQuestions(prev => prev.map(q => q.id === editingQuestion.id ? editingQuestion : q));
       setEditingQuestion(null);
-      showNotify("Đã cập nhật thay đổi câu hỏi.", "success");
+      showNotify("Đã lưu thay đổi câu hỏi.", "success");
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingQuestion) return;
+
+    if (!file.type.startsWith('image/')) {
+      showNotify("Vui lòng chỉ chọn định dạng hình ảnh.", "warning");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setEditingQuestion({ ...editingQuestion, image: base64 });
+      showNotify("Đã cập nhật ảnh minh họa mới.", "success");
+    };
+  };
+
+  const handleRemoveImage = () => {
+    if (editingQuestion) {
+      setEditingQuestion({ ...editingQuestion, image: undefined });
+      showNotify("Đã xóa ảnh minh họa.", "info");
+    }
   };
 
   const currentFolder = folders.find(f => f.id === selectedFolderId);
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-white overflow-hidden animate-fade-in">
-      {/* Sidebar - Thư mục */}
+    <div className="h-full flex flex-col md:flex-row bg-white overflow-hidden animate-fade-in font-inter">
+      {/* Sidebar - Folders */}
       <aside className="w-full md:w-72 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
         <div className="p-6 border-b border-slate-200 bg-white flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -97,10 +122,10 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
             onClick={() => setSelectedFolderId('all')}
             className={`w-full text-left px-5 py-4 rounded-2xl font-bold text-sm flex items-center gap-3 transition-all ${selectedFolderId === 'all' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-200/50'}`}
           >
-            <i className="fas fa-layer-group"></i> Tất cả
+            <i className="fas fa-layer-group"></i> Tất cả câu hỏi
           </button>
           
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-5 mt-8 mb-3">Thư mục chuyên đề</div>
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-5 mt-8 mb-3">Chuyên đề bài học</div>
 
           {folders.map(f => (
             <div key={f.id} className="group relative">
@@ -152,7 +177,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                 <span>/ Quản lý học liệu</span>
               </nav>
               <h2 className="text-3xl font-black text-slate-900 flex items-center gap-4 tracking-tighter">
-                {selectedFolderId === 'all' ? 'Tổng kho câu hỏi' : currentFolder?.name}
+                {selectedFolderId === 'all' ? 'Tổng hợp ngân hàng' : currentFolder?.name}
                 <span className="text-sm font-bold bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full">{filteredQuestions.length}</span>
               </h2>
             </div>
@@ -162,7 +187,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                  <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"></i>
                  <input 
                     type="text" 
-                    placeholder="Tìm nội dung câu hỏi..." 
+                    placeholder="Tìm theo nội dung..." 
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     className="pl-12 pr-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/5 focus:bg-white transition-all w-full lg:w-72"
@@ -173,7 +198,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                 onChange={e => setBloomFilter(e.target.value)}
                 className="px-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black text-slate-600 outline-none hover:bg-white transition cursor-pointer"
                >
-                 <option value="Tất cả">Tất cả mức độ</option>
+                 <option value="Tất cả">Cấp độ Bloom</option>
                  {BLOOM_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
                </select>
             </div>
@@ -193,12 +218,12 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
           </div>
         </header>
 
-        {/* List View Table-like style */}
+        {/* List View Container */}
         <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30 custom-scrollbar">
           {filteredQuestions.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-300">
                 <i className="fas fa-folder-open text-7xl mb-6 opacity-20"></i>
-                <p className="font-black text-xs uppercase tracking-[0.3em]">Kho dữ liệu trống</p>
+                <p className="font-black text-xs uppercase tracking-[0.3em]">Kho câu hỏi trống</p>
             </div>
           ) : (
             <div className="space-y-4 max-w-6xl mx-auto">
@@ -212,10 +237,10 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                       <span className="text-xs font-black text-slate-800">{q.id.substring(0, 4).toUpperCase()}</span>
                    </div>
 
-                   {/* Nội dung rút gọn */}
+                   {/* Nội dung rút gọn (Line Clamp) */}
                    <div className="flex-1 min-w-0">
                       <div className="font-bold text-slate-800 leading-relaxed text-base line-clamp-2 overflow-hidden mb-2">
-                        {formatContent(q.content)}
+                        {q.content}
                       </div>
                       <div className="flex items-center gap-3">
                          <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-3 py-1 rounded-full uppercase tracking-tighter border border-slate-200">{q.category}</span>
@@ -224,7 +249,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                       </div>
                    </div>
 
-                   {/* Hành động */}
+                   {/* Cột Hành động */}
                    <div className="flex items-center gap-2 shrink-0 md:opacity-0 group-hover:opacity-100 transition-all transform md:translate-x-4 group-hover:translate-x-0">
                       <button 
                         onClick={() => setViewingQuestion(q)} 
@@ -243,7 +268,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                       <button 
                         onClick={() => deleteQuestion(q.id)} 
                         className="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white hover:scale-110 active:scale-90 transition shadow-lg shadow-red-100" 
-                        title="Xóa vĩnh viễn"
+                        title="Xóa"
                       >
                         <i className="fas fa-trash-alt text-sm"></i>
                       </button>
@@ -254,7 +279,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
           )}
         </div>
 
-        {/* Modal: Xem chi tiết câu hỏi nâng cao */}
+        {/* Modal: Xem chi tiết câu hỏi (Detail Modal) */}
         {viewingQuestion && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 md:p-12 bg-slate-950/80 backdrop-blur-md animate-fade-in">
                 <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[4rem] shadow-2xl flex flex-col overflow-hidden border border-white/20 animate-fade-in-up">
@@ -267,7 +292,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                                 </span>
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200 px-3 py-1.5 rounded-full">REF: {viewingQuestion.id.toUpperCase()}</span>
                             </div>
-                            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Hồ sơ câu hỏi học thuật</h3>
+                            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Chi tiết hồ sơ học thuật</h3>
                         </div>
                         <button onClick={() => setViewingQuestion(null)} className="w-14 h-14 rounded-full bg-white shadow-xl border border-slate-100 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all transform active:scale-90">
                             <i className="fas fa-times text-xl"></i>
@@ -275,32 +300,32 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                     </header>
 
                     <div className="flex-1 overflow-y-auto p-12 space-y-12 custom-scrollbar">
-                        {/* 1. Nội dung văn bản */}
-                        <div className="space-y-4">
-                             <label className="text-[10px] font-black text-blue-600 uppercase tracking-[0.4em] block ml-1">Nội dung đề bài</label>
+                        {/* 1. Nội dung văn bản câu hỏi */}
+                        <section className="space-y-4">
+                             <label className="text-[10px] font-black text-blue-600 uppercase tracking-[0.4em] block ml-1">Nội dung câu hỏi</label>
                              <div className="text-2xl font-black text-slate-800 leading-relaxed bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner">
                                  {formatContent(viewingQuestion.content)}
                              </div>
-                        </div>
+                        </section>
 
-                        {/* 2. Ảnh minh họa chuyên sâu */}
+                        {/* 2. Ảnh minh họa (nếu có) */}
                         {viewingQuestion.image && (
-                            <div className="space-y-4">
-                                <label className="text-[10px] font-black text-orange-600 uppercase tracking-[0.4em] block ml-1">Tư liệu hình ảnh / Sơ đồ</label>
+                            <section className="space-y-4">
+                                <label className="text-[10px] font-black text-orange-600 uppercase tracking-[0.4em] block ml-1">Hình ảnh / Sơ đồ đính kèm</label>
                                 <div className="bg-slate-900 p-8 rounded-[3rem] border border-slate-800 shadow-2xl flex justify-center">
                                     <img 
                                         src={viewingQuestion.image} 
                                         className="max-h-[500px] w-auto object-contain rounded-2xl shadow-2xl border border-white/5" 
-                                        alt="Tư liệu đồ họa" 
+                                        alt="Tư liệu minh họa" 
                                     />
                                 </div>
-                            </div>
+                            </section>
                         )}
 
-                        {/* 3. Tùy chọn phản hồi */}
-                        <div className="space-y-4">
+                        {/* 3. Phản hồi chuẩn (Options hoặc Answer Box) */}
+                        <section className="space-y-4">
                             <label className="text-[10px] font-black text-green-600 uppercase tracking-[0.4em] block ml-1">
-                                {viewingQuestion.type === QuestionType.MULTIPLE_CHOICE ? 'Đáp án & Phương án' : 'Hệ thống gợi ý chấm điểm'}
+                                {viewingQuestion.type === QuestionType.MULTIPLE_CHOICE ? 'Phương án lựa chọn' : 'Đáp án chuẩn từ giáo trình'}
                             </label>
                             
                             {viewingQuestion.type === QuestionType.MULTIPLE_CHOICE ? (
@@ -320,25 +345,25 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                                     {formatContent(viewingQuestion.correctAnswer)}
                                 </div>
                             )}
-                        </div>
+                        </section>
 
-                        {/* 4. Giải thích chuyên môn */}
+                        {/* 4. Giải thích / Metadata */}
                         {viewingQuestion.explanation && (
-                            <div className="space-y-4">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] block ml-1">Diễn giải kỹ thuật</label>
+                            <section className="space-y-4">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] block ml-1">Giải thích chi tiết</label>
                                 <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 text-sm text-slate-500 font-medium leading-relaxed italic">
                                     <i className="fas fa-info-circle mr-3 text-blue-400"></i>
                                     {formatContent(viewingQuestion.explanation)}
                                 </div>
-                            </div>
+                            </section>
                         )}
 
-                        {/* 5. Metadata Footer */}
+                        {/* Footer Metadata Grid */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-12 border-t border-slate-100">
                              {[
                                  { icon: 'fa-brain', color: 'blue', label: 'Cấp độ Bloom', value: viewingQuestion.bloomLevel },
-                                 { icon: 'fa-folder-open', color: 'yellow', label: 'Chủ đề gốc', value: folders.find(f => f.id === viewingQuestion.folderId)?.name },
-                                 { icon: 'fa-clock', color: 'indigo', label: 'Thời điểm nạp', value: new Date(viewingQuestion.createdAt).toLocaleString('vi-VN') }
+                                 { icon: 'fa-folder-open', color: 'yellow', label: 'Chuyên đề', value: folders.find(f => f.id === viewingQuestion.folderId)?.name },
+                                 { icon: 'fa-clock', color: 'indigo', label: 'Ngày tạo', value: new Date(viewingQuestion.createdAt).toLocaleString('vi-VN') }
                              ].map((item, idx) => (
                                 <div key={idx} className="bg-slate-50 p-5 rounded-3xl flex items-center gap-5 border border-slate-100">
                                     <div className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-${item.color}-500 shadow-sm border border-slate-100`}>
@@ -368,22 +393,22 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                             }} 
                             className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-blue-500/20 hover:bg-blue-700 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3"
                         >
-                            <i className="fas fa-edit"></i> Chỉnh sửa câu hỏi
+                            <i className="fas fa-edit"></i> CHỈNH SỬA
                         </button>
                     </footer>
                 </div>
             </div>
         )}
 
-        {/* Modal: Form Chỉnh sửa nguyên bản (Giữ nguyên logic nhập liệu) */}
+        {/* Modal: Chỉnh sửa câu hỏi (Edit Modal - Đã nâng cấp quản lý ảnh) */}
         {editingQuestion && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-xl animate-fade-in">
                 <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
                     <header className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
                         <div>
-                            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Cập nhật dữ liệu</h3>
+                            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Cập nhật câu hỏi</h3>
                             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2 flex items-center gap-2">
-                                <i className="fas fa-code"></i> System UUID: {editingQuestion.id.toUpperCase()}
+                                <i className="fas fa-code"></i> ID: {editingQuestion.id.toUpperCase()}
                             </p>
                         </div>
                         <button onClick={() => setEditingQuestion(null)} className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all transform active:scale-90">
@@ -394,13 +419,38 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                     <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                             <div className="space-y-8">
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Nội dung đề bài</label>
-                                    <textarea 
-                                        value={editingQuestion.content} 
-                                        onChange={e => setEditingQuestion({...editingQuestion, content: e.target.value})}
-                                        className="w-full h-48 p-6 bg-slate-50 border border-slate-200 rounded-[2rem] outline-none focus:border-blue-500 font-bold text-slate-800 transition-all shadow-inner focus:bg-white"
-                                    />
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Nội dung đề bài & Ảnh minh họa</label>
+                                    <div className="relative">
+                                      <textarea 
+                                          value={editingQuestion.content} 
+                                          onChange={e => setEditingQuestion({...editingQuestion, content: e.target.value})}
+                                          className="w-full h-48 p-6 bg-slate-50 border border-slate-200 rounded-[2rem] outline-none focus:border-blue-500 font-bold text-slate-800 transition-all shadow-inner focus:bg-white"
+                                      />
+                                      <label className="absolute bottom-4 right-4 w-10 h-10 bg-white rounded-xl shadow-lg border border-slate-100 flex items-center justify-center text-blue-600 cursor-pointer hover:bg-blue-600 hover:text-white transition-all">
+                                          <i className="fas fa-image"></i>
+                                          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                      </label>
+                                    </div>
+
+                                    {/* Ảnh minh họa Section */}
+                                    {editingQuestion.image && (
+                                      <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex items-center gap-4 group animate-fade-in-up">
+                                          <div className="h-16 w-16 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm shrink-0">
+                                              <img src={editingQuestion.image} className="w-full h-full object-contain" alt="Preview" />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                              <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">Ảnh minh họa đang nạp</p>
+                                              <p className="text-[10px] text-slate-400 truncate font-medium">Sơ đồ kỹ thuật đính kèm</p>
+                                          </div>
+                                          <button 
+                                            onClick={handleRemoveImage}
+                                            className="w-8 h-8 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center shadow-sm"
+                                          >
+                                              <i className="fas fa-trash text-[9px]"></i>
+                                          </button>
+                                      </div>
+                                    )}
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -414,7 +464,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Vị trí bài học</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Thư mục bài</label>
                                         <select 
                                             value={editingQuestion.folderId}
                                             onChange={e => setEditingQuestion({...editingQuestion, folderId: e.target.value})}
@@ -429,7 +479,7 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                             <div className="space-y-8">
                                 {editingQuestion.type === QuestionType.MULTIPLE_CHOICE ? (
                                     <div className="space-y-4">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Các tùy chọn & Đáp án đúng</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Phương án & Đáp án đúng (Xanh)</label>
                                         <div className="space-y-3">
                                             {editingQuestion.options?.map((opt, i) => (
                                                 <div key={i} className="flex gap-3">
@@ -461,18 +511,18 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                                             value={editingQuestion.correctAnswer}
                                             onChange={e => setEditingQuestion({...editingQuestion, correctAnswer: e.target.value})}
                                             className="w-full h-72 p-6 bg-slate-50 border border-slate-200 rounded-[2rem] outline-none focus:border-blue-500 font-bold text-slate-800 transition-all shadow-inner focus:bg-white"
-                                            placeholder="Căn cứ chấm điểm..."
+                                            placeholder="Gợi ý chấm điểm..."
                                         />
                                     </div>
                                 )}
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Ghi chú chuyên môn (Optional)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">Ghi chú / Giải thích</label>
                                     <input 
                                         type="text" 
                                         value={editingQuestion.explanation}
                                         onChange={e => setEditingQuestion({...editingQuestion, explanation: e.target.value})}
                                         className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-medium text-slate-600 focus:bg-white"
-                                        placeholder="Vd: Theo TCVN 3144:1979..."
+                                        placeholder="Vd: Nguồn PV đạt hiệu suất..."
                                     />
                                 </div>
                             </div>
@@ -480,8 +530,8 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                     </div>
 
                     <footer className="p-10 border-t border-slate-50 bg-slate-50/50 flex justify-end gap-5 shrink-0">
-                        <button onClick={() => setEditingQuestion(null)} className="px-10 py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-100 transition-all">Hủy bỏ</button>
-                        <button onClick={handleUpdateQuestion} className="px-14 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-blue-600 transition-all transform hover:scale-105 active:scale-95">LƯU THAY ĐỔI</button>
+                        <button onClick={() => setEditingQuestion(null)} className="px-10 py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-100 transition-all">Hủy</button>
+                        <button onClick={handleUpdateQuestion} className="px-14 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl hover:bg-blue-600 transition-all transform hover:scale-105 active:scale-95">LƯU CẬP NHẬT</button>
                     </footer>
                 </div>
             </div>

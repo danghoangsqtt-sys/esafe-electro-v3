@@ -22,8 +22,7 @@ export interface Question {
   explanation: string;
   createdAt: number;
   bloomLevel?: string;
-  imageUrl?: string; 
-  image?: string; // Đính kèm dữ liệu ảnh dạng Base64
+  image?: string; // Dữ liệu ảnh dạng Base64
 }
 
 export interface PdfMetadata {

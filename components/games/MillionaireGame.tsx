@@ -81,11 +81,11 @@ const MillionaireGame: React.FC<MillionaireGameProps> = ({ questions, onExit }) 
                   <div className="text-2xl md:text-3xl font-black leading-tight text-blue-50">
                     {formatContent(currentQ.content)}
                   </div>
-                  {/* Hiển thị ảnh minh họa */}
-                  {(currentQ.image || currentQ.imageUrl) && (
+                  {/* Hiển thị ảnh minh họa - Fix: use currentQ.image instead of imageUrl */}
+                  {currentQ.image && (
                     <div className="mt-8 flex justify-center">
                         <img 
-                            src={currentQ.image || currentQ.imageUrl} 
+                            src={currentQ.image} 
                             alt="Sơ đồ minh họa" 
                             className="max-h-64 object-contain rounded-xl mx-auto my-4 shadow-md border border-white/10" 
                         />
