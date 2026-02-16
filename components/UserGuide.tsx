@@ -98,7 +98,7 @@ const UserGuide: React.FC = () => {
                 <div className="bg-blue-50 p-10 rounded-[2.5rem] border border-blue-100 space-y-4">
                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-lg text-2xl"><i className="fas fa-microphone-lines"></i></div>
                    <h3 className="text-xl font-black text-blue-900">Vấn đáp (Live Voice)</h3>
-                   <p className="text-sm text-blue-800/70 font-medium leading-relaxed">Chế độ Low-Latency cho phép bạn trình bày kiến thức bằng giọng nói. AI sẽ lắng nghe, phân tích và phản hồi như một giảng viên thực thụ.</p>
+                   <p className="text-sm text-blue-800/70 font-medium leading-relaxed">Chế độ Low-Latency cho phép bạn trình bày kiến thức bằng giọng nói. AI sẽ lắng nghe, phân tích và phân hồi như một giảng viên thực thụ.</p>
                 </div>
              </div>
              <div className="p-6 bg-slate-900 rounded-3xl text-white/80 text-xs font-bold flex items-center gap-4">
@@ -216,42 +216,27 @@ const UserGuide: React.FC = () => {
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+             <div className="max-w-3xl mx-auto w-full">
                 <div className="space-y-6">
                    <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
                       <i className="fas fa-sync-alt text-blue-600"></i> Cơ chế Smart Update
                    </h3>
-                   <div className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm space-y-6">
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium">Hệ thống sử dụng tệp <strong>version.json</strong> trên máy chủ GitHub để so sánh với phiên bản nội bộ.</p>
+                   <div className="p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm space-y-6">
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium">Hệ thống sử dụng tệp <strong>version.json</strong> trên máy chủ GitHub để so sánh với phiên bản nội bộ và đưa ra các đề xuất nâng cấp an toàn.</p>
                       <ul className="space-y-4">
                          <li className="flex gap-4">
                             <i className="fas fa-bell text-blue-500 mt-1"></i>
-                            <p className="text-xs font-bold text-slate-500">Thông báo đẩy ngay lập tức khi phát hiện bản vá lỗi hoặc tính năng mới.</p>
+                            <p className="text-xs font-bold text-slate-500">Thông báo đẩy ngay lập tức khi phát hiện bản vá lỗi hoặc tính năng mới từ đội ngũ phát triển.</p>
                          </li>
                          <li className="flex gap-4">
                             <i className="fas fa-scroll text-blue-500 mt-1"></i>
-                            <p className="text-xs font-bold text-slate-500">Hiển thị lịch sử thay đổi (Changelog) chi tiết cho mỗi bản nâng cấp.</p>
+                            <p className="text-xs font-bold text-slate-500">Hiển thị lịch sử thay đổi (Changelog) chi tiết cho mỗi bản nâng cấp để bạn nắm bắt các cải tiến.</p>
+                         </li>
+                         <li className="flex gap-4">
+                            <i className="fas fa-database text-blue-500 mt-1"></i>
+                            <p className="text-xs font-bold text-slate-500">Đảm bảo toàn vẹn dữ liệu: Việc cập nhật không làm ảnh hưởng đến cơ sở dữ liệu câu hỏi hiện có của bạn.</p>
                          </li>
                       </ul>
-                   </div>
-                </div>
-
-                <div className="space-y-6">
-                   <h3 className="text-xl font-black text-gray-800 uppercase tracking-tight flex items-center gap-3">
-                      <i className="fas fa-terminal text-slate-900"></i> Đóng gói & Triển khai
-                   </h3>
-                   <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white space-y-4 shadow-2xl">
-                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Dành cho Nhà phát triển</p>
-                      <div className="space-y-4">
-                         <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <code className="text-xs font-mono text-green-400">npm run build</code>
-                            <p className="text-[10px] text-slate-400 mt-2">Lệnh build ứng dụng Electron để tạo file .exe cho Windows.</p>
-                         </div>
-                         <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                            <code className="text-xs font-mono text-green-400">package.json -> version</code>
-                            <p className="text-[10px] text-slate-400 mt-2">Cập nhật số phiên bản tại đây để hệ thống nhận diện bản nâng cấp.</p>
-                         </div>
-                      </div>
                    </div>
                 </div>
              </div>
