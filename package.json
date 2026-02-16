@@ -1,7 +1,7 @@
 {
-  "name": "e-safepower-learning",
-  "version": "2.1.0",
-  "description": "Nền tảng học tập Nguồn điện an toàn và môi trường - DHsystem",
+  "name": "LMS System",
+  "version": "4.1.0",
+  "description": "Nền tảng LMS - DHsystem",
   "main": "main.js",
   "scripts": {
     "dev": "vite",
@@ -27,8 +27,8 @@
     "vite": "^7.3.0"
   },
   "build": {
-    "appId": "com.dhsystem.esafepower",
-    "productName": "E-SafePower",
+    "appId": "com.dhsystem.lms",
+    "productName": "LMS-DHsystem",
     "copyright": "Copyright © 2026 DHsystem",
     "directories": {
       "output": "dist-electron"
@@ -50,10 +50,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "E-SafePower Learning",
+      "shortcutName": "LMS System",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "uninstallDisplayName": "Gỡ cài đặt E-SafePower"
+      "uninstallDisplayName": "Gỡ cài đặt LMS-System"
     },
     "files": [
       "dist/**/*",
