@@ -1,6 +1,6 @@
 {
-  "name": "LMS System",
-  "version": "4.1.0",
+  "name": "LMS-System",
+  "version": "3.9.0",
   "description": "Nền tảng LMS - DHsystem",
   "main": "main.js",
   "scripts": {
