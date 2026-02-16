@@ -11,6 +11,7 @@ import QuestionBankManager from './components/QuestionBankManager';
 import ChangelogModal from './components/ChangelogModal';
 import NewsSection from './components/NewsSection';
 import { Question, VectorChunk, QuestionFolder, Exam } from './types';
+import pkg from './package.json';
 
 // Sử dụng Window augmentation từ types.ts để truy cập require một cách an toàn
 const ipcRenderer = typeof window !== 'undefined' && window.require 
@@ -170,7 +171,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-2xl font-black tracking-tighter leading-none text-slate-900">LMS Core</span>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Version 2.1</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Version {pkg.version}</span>
               </div>
             </div>
           </div>

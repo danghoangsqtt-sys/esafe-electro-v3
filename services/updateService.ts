@@ -1,3 +1,4 @@
+
 import { AppVersionInfo } from "../types";
 import packageJson from "../package.json";
 

@@ -1,10 +1,5 @@
 
 {
-  "name": "E-SafePower Learning System v2.1 (DHsystem)",
-  "description": "Nền tảng học tập thông minh môn Nguồn điện an toàn và môi trường tích hợp AI Gemini đa phương thức và Google Search Grounding.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone",
-    "geolocation"
-  ]
+  "name": "LMS Learning System v3.9.0",
+  "description": "Nền tảng học tập thông minh: tích hợp AI và Google Search Grounding."
 }

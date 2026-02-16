@@ -1,5 +1,6 @@
+
 {
-  "name": "LMS-System",
+  "name": "lms-system",
   "version": "3.9.0",
   "description": "Nền tảng LMS - DHsystem",
   "main": "main.js",

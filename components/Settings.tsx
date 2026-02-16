@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppSettings, AppVersionInfo } from '../types';
 import { checkAppUpdate } from '../services/updateService';
+import pkg from '../package.json';
 
 interface SettingsProps {
   onNotify: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
@@ -131,7 +132,7 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
           </div>
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Trung tâm Quản trị LMS</h1>
-            <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mt-2">Bảng điều khiển lõi hệ thống LMS v2.1</p>
+            <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mt-2">Bảng điều khiển lõi hệ thống LMS v{pkg.version}</p>
           </div>
         </div>
         <div className="flex gap-3">
