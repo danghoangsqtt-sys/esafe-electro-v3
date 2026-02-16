@@ -3,13 +3,15 @@ import React, { useState, useMemo } from 'react';
 import { Question, QuestionType, QuestionFolder } from '../types';
 import TimedChallengeGame from './games/TimedChallengeGame';
 import OralGame from './games/OralGame';
+import FlashcardGame from './games/FlashcardGame';
+import MillionaireGame from './games/MillionaireGame';
 
 interface GameQuizProps {
   questions: Question[];
   folders: QuestionFolder[];
 }
 
-type GameMode = 'LOBBY' | 'TIMED' | 'ORAL';
+type GameMode = 'LOBBY' | 'TIMED' | 'ORAL' | 'FLASHCARD' | 'MILLIONAIRE';
 
 const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
   const [mode, setMode] = useState<GameMode>('LOBBY');
@@ -22,7 +24,7 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
       ? questions 
       : questions.filter(q => selectedFolderIds.includes(q.folderId));
     
-    // Tùy biến lọc theo mode nếu cần thiết (ví dụ Oral chỉ lấy Essay)
+    // Tùy biến lọc theo mode nếu cần thiết
     if (mode === 'ORAL') {
       base = base.filter(q => q.type === QuestionType.ESSAY);
     }
@@ -39,13 +41,21 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
     return <OralGame questions={filteredQuestions} onExit={() => setMode('LOBBY')} />;
   }
 
+  if (mode === 'FLASHCARD') {
+    return <FlashcardGame questions={filteredQuestions} onExit={() => setMode('LOBBY')} />;
+  }
+
+  if (mode === 'MILLIONAIRE') {
+    return <MillionaireGame questions={filteredQuestions} onExit={() => setMode('LOBBY')} />;
+  }
+
   return (
     <div className="h-full p-8 bg-gray-50 overflow-y-auto custom-scrollbar font-inter">
       <header className="max-w-6xl mx-auto mb-12 animate-fade-in">
         <div className="flex items-center gap-4 text-blue-600 font-black text-[10px] uppercase tracking-[0.3em] mb-3">
            <i className="fas fa-gamepad"></i> Trung tâm Giải trí & Học thuật
         </div>
-        <h2 className="text-5xl font-black text-slate-900 tracking-tighter">Học mà chơi,<br/> <span className="text-blue-600">Chơi mà học</span></h2>
+        <h2 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">Học mà chơi,<br/> <span className="text-blue-600">Chơi mà học</span></h2>
       </header>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -60,7 +70,7 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
                     multiple
                     value={selectedFolderIds}
                     onChange={e => setSelectedFolderIds(Array.from(e.target.selectedOptions, option => option.value))}
-                    className="w-full h-48 p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
+                    className="w-full h-48 p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-500/5 transition-all custom-scrollbar"
                  >
                     <option value="all">Tất cả ngân hàng đề</option>
                     {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -101,11 +111,27 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
             description="Trò chuyện với giảng viên AI, trình bày kiến thức bằng giọng nói."
             available={questions.filter(q => q.type === QuestionType.ESSAY).length > 0}
           />
+          <GameCard 
+            onClick={() => setMode('MILLIONAIRE')}
+            icon="fa-money-bill-trend-up"
+            color="green"
+            title="Ai là triệu phú"
+            description="Leo lên đỉnh kim tự tháp kiến thức và nhận điểm thưởng khổng lồ."
+            available={questions.filter(q => q.type === QuestionType.MULTIPLE_CHOICE).length >= 10}
+          />
+          <GameCard 
+            onClick={() => setMode('FLASHCARD')}
+            icon="fa-clone"
+            color="purple"
+            title="Thẻ ghi nhớ"
+            description="Phương pháp học tập chủ động qua các thẻ câu hỏi lật mặt."
+            available={questions.length > 0}
+          />
           
           <div className="md:col-span-2 bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:scale-110 transition-transform duration-1000"></div>
               <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
-                  <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center text-3xl border border-white/10 shadow-2xl">
+                  <div className="w-20 h-20 bg-white/10 rounded-3xl flex items-center justify-center text-3xl border border-white/10 shadow-2xl group-hover:rotate-12 transition-transform">
                      <i className="fas fa-trophy text-yellow-400"></i>
                   </div>
                   <div className="flex-1 text-center md:text-left">
@@ -132,7 +158,7 @@ const GameCard = ({ onClick, icon, color, title, description, available }: any) 
     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-8 text-2xl transition-all group-hover:rotate-12 bg-${color}-50 text-${color}-600 border border-${color}-100`}>
       <i className={`fas ${icon}`}></i>
     </div>
-    <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">{title}</h3>
+    <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight leading-none">{title}</h3>
     <p className="text-slate-500 text-sm font-medium leading-relaxed mb-8 flex-1">{description}</p>
     <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${available ? `text-${color}-600` : 'text-slate-400'}`}>
        {available ? (

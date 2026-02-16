@@ -1,5 +1,4 @@
 
-
 export enum QuestionType {
   MULTIPLE_CHOICE = 'MULTIPLE_CHOICE',
   ESSAY = 'ESSAY',
@@ -12,8 +11,6 @@ export interface QuestionFolder {
   createdAt: number;
 }
 
-export type BloomLevel = 'Nhandien' | 'Thonghieu' | 'Vandung' | 'Vandungcao';
-
 export interface Question {
   id: string;
   folderId: string;
@@ -25,6 +22,8 @@ export interface Question {
   explanation: string;
   createdAt: number;
   bloomLevel?: string;
+  imageUrl?: string; 
+  image?: string; // Đính kèm dữ liệu ảnh dạng Base64
 }
 
 export interface PdfMetadata {
@@ -62,7 +61,6 @@ export interface ChatMessage {
 
 export interface AppSettings {
   modelName: string;
-  manualApiKey?: string;
   aiVoice: string;
   temperature: number;
   maxOutputTokens: number;
@@ -89,4 +87,3 @@ export interface NewsArticle {
   date: string;
   source: string;
 }
-

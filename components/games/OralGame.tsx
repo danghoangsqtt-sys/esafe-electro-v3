@@ -99,7 +99,7 @@ const OralGame: React.FC<OralGameProps> = ({ questions, onExit }) => {
   const currentQ = questions[currentIdx];
 
   return (
-    <div className="min-h-full bg-slate-950 text-white p-6 md:p-10 flex flex-col items-center justify-center font-inter">
+    <div className="min-h-full bg-slate-950 text-white p-6 md:p-10 flex flex-col items-center justify-center font-inter overflow-y-auto custom-scrollbar">
       <div className="w-full max-w-3xl space-y-8 animate-fade-in">
         <header className="flex justify-between items-center mb-4">
            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">AI Oral Examination Mode</span>
@@ -110,7 +110,19 @@ const OralGame: React.FC<OralGameProps> = ({ questions, onExit }) => {
           <h2 className="text-2xl md:text-3xl font-black mb-4 leading-tight">
             {formatContent(currentQ.content)}
           </h2>
-          <p className="text-slate-500 text-xs italic">AI sẽ chấm điểm dựa trên độ chính xác kỹ thuật của bạn.</p>
+          
+          {/* Hiển thị ảnh minh họa */}
+          {currentQ.image && (
+            <div className="mt-6 flex justify-center">
+                <img 
+                    src={currentQ.image} 
+                    alt="Minh họa chuyên môn" 
+                    className="max-h-60 rounded-2xl shadow-xl object-contain border border-white/10" 
+                />
+            </div>
+          )}
+          
+          <p className="text-slate-500 text-xs italic mt-4">AI sẽ chấm điểm dựa trên độ chính xác kỹ thuật của bạn.</p>
         </div>
 
         <div className="relative group">

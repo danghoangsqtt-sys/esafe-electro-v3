@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { Question, QuestionType, QuestionFolder } from '../../types';
 
 interface ManualCreatorTabProps {
@@ -19,7 +18,6 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
   folders, 
   selectedFolderId, 
   onQuestionCreated, 
-  onQuestionsGenerated,
   onNotify, 
   isLoading, 
   setIsLoading 
@@ -32,7 +30,8 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
     explanation: '',
     bloomLevel: 'Nhận biết',
     category: 'An toàn điện',
-    folderId: selectedFolderId
+    folderId: selectedFolderId,
+    image: '' // Chuỗi Base64 ảnh minh họa
   });
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -44,37 +43,38 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
     });
   };
 
-  const handleAiFileAnalysis = async (file: File) => {
+  /**
+   * Xử lý đính kèm ảnh minh họa cho câu hỏi
+   */
+  const handleAttachImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        onNotify("Vui lòng chỉ chọn định dạng hình ảnh (PNG, JPG, JPEG).", "warning");
+        return;
+    }
+
     setIsLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: {
-          parts: [
-            { text: "Hãy phân tích tệp/hình ảnh này và trích xuất toàn bộ câu hỏi. Chuyển đổi mọi công thức toán học, ký hiệu điện học thành LaTeX đặt trong dấu $...$. Nếu là tự luận, hãy tạo ra đáp án chuẩn đầy đủ cho trường 'correctAnswer'. Trả về định dạng JSON array: [{content, type, options, correctAnswer, explanation, bloomLevel, category}]. Lưu ý: Trường 'type' bắt buộc là 'MULTIPLE_CHOICE' hoặc 'ESSAY'." },
-            { inlineData: { data: await fileToBase64(file), mimeType: file.type } }
-          ]
-        }
-      });
+        const base64 = await fileToBase64(file);
+        setManualQ(prev => ({ 
+            ...prev, 
+            image: `data:${file.type};base64,${base64}` 
+        }));
+        onNotify("Đã đính kèm ảnh minh họa cho câu hỏi.", "success");
+    } catch (err) {
+        onNotify("Lỗi khi xử lý hình ảnh.", "error");
+    } finally {
+        setIsLoading(false);
+    }
+  };
 
-      const text = response.text || "[]";
-      const cleanJson = text.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      
-      const processed = parsed.map((q: any) => ({
-        ...q, 
-        id: Math.random().toString(36).substr(2, 9), 
-        folderId: selectedFolderId, 
-        createdAt: Date.now(),
-        type: (String(q.type).includes('MULTIPLE') || String(q.type).includes('TRẮC NGHIỆM')) ? QuestionType.MULTIPLE_CHOICE : QuestionType.ESSAY
-      }));
-      
-      onQuestionsGenerated(processed);
-      onNotify("AI đã trích xuất dữ liệu từ hình ảnh thành công.", "success");
-    } catch (e) {
-      onNotify("Không thể xử lý tệp này.", "error");
-    } finally { setIsLoading(false); }
+  /**
+   * Xóa ảnh đính kèm hiện tại
+   */
+  const handleRemoveImage = () => {
+    setManualQ(prev => ({ ...prev, image: '' }));
   };
 
   const handleAddManual = () => {
@@ -94,7 +94,16 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
     } as Question;
 
     onQuestionCreated(newQuestion);
-    setManualQ({ ...manualQ, content: '', correctAnswer: '', explanation: '', options: ['', '', '', ''] });
+    
+    // Reset form sau khi thêm thành công
+    setManualQ({ 
+        ...manualQ, 
+        content: '', 
+        correctAnswer: '', 
+        explanation: '', 
+        options: ['', '', '', ''],
+        image: '' 
+    });
     onNotify("Đã thêm câu hỏi vào ngân hàng đề.", "success");
   };
 
@@ -102,35 +111,64 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
     <div className="space-y-8 animate-fade-in">
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-4">
-             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nội dung câu hỏi & Hình ảnh</label>
+             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nội dung câu hỏi & Ảnh minh họa</label>
              <div className="relative group">
                 <textarea 
                    value={manualQ.content} 
                    onChange={e => setManualQ({...manualQ, content: e.target.value})} 
                    placeholder="Nhập nội dung câu hỏi (sử dụng $...$ cho LaTeX)..." 
-                   className="w-full h-64 p-8 bg-gray-50 border border-gray-200 rounded-[2.5rem] outline-none focus:border-blue-500 font-medium transition-all focus:bg-white focus:shadow-xl" 
+                   className="w-full h-72 p-8 bg-gray-50 border border-gray-200 rounded-[2.5rem] outline-none focus:border-blue-500 font-medium transition-all focus:bg-white focus:shadow-xl custom-scrollbar" 
                 />
+                
+                {/* Preview ảnh minh họa nếu có */}
+                {manualQ.image && (
+                    <div className="absolute bottom-24 left-8 right-8 h-32 bg-white/90 backdrop-blur rounded-2xl border border-blue-100 p-2 flex items-center gap-4 shadow-xl group/img animate-fade-in-up">
+                        <div className="h-full aspect-square rounded-xl overflow-hidden border border-gray-100 bg-slate-50 shadow-inner">
+                            <img src={manualQ.image} className="w-full h-full object-contain" alt="Preview minh họa" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-tight">Ảnh đính kèm</p>
+                            <p className="text-[9px] text-gray-400 leading-tight">Ảnh này sẽ hiển thị ngay dưới nội dung câu hỏi trong các chế độ chơi.</p>
+                        </div>
+                        <button 
+                            onClick={handleRemoveImage}
+                            className="w-8 h-8 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center mr-2 shadow-sm"
+                        >
+                            <i className="fas fa-trash-alt text-[10px]"></i>
+                        </button>
+                    </div>
+                )}
+
                 <label className="absolute bottom-6 right-6 w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-blue-600 shadow-lg border border-gray-100 cursor-pointer hover:bg-blue-600 hover:text-white transition-all active:scale-90">
-                   <i className="fas fa-camera text-xl"></i>
-                   <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleAiFileAnalysis(e.target.files[0])} />
+                   {isLoading ? <i className="fas fa-circle-notch fa-spin text-xl"></i> : <i className="fas fa-image text-xl"></i>}
+                   <input 
+                     type="file" 
+                     accept="image/*" 
+                     className="hidden" 
+                     onChange={handleAttachImage} 
+                   />
                 </label>
              </div>
-             <p className="text-[10px] text-gray-400 italic px-4">Nhấn vào biểu tượng camera để AI trích xuất câu hỏi từ ảnh chụp đề thi.</p>
+             <p className="text-[10px] text-gray-400 italic px-4 flex items-center gap-2">
+                 <i className="fas fa-info-circle text-blue-400"></i>
+                 Chọn biểu tượng ảnh để đính kèm sơ đồ mạch điện, biểu đồ hoặc hình ảnh minh họa cho câu hỏi.
+             </p>
           </div>
+          
           <div className="space-y-6">
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mức độ trí tuệ</label>
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mức độ Bloom</label>
                    <select 
                       value={manualQ.bloomLevel} 
                       onChange={e => setManualQ({...manualQ, bloomLevel: e.target.value})} 
-                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-slate-700 focus:bg-white outline-none"
+                      className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl font-bold text-slate-700 focus:bg-white outline-none transition-all"
                    >
                       {BLOOM_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
                    </select>
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Hình thức thi</label>
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Loại câu hỏi</label>
                    <div className="flex gap-1 bg-gray-50 p-1 rounded-2xl border border-gray-200">
                       <button onClick={() => setManualQ({...manualQ, type: QuestionType.MULTIPLE_CHOICE})} className={`flex-1 py-3 rounded-xl font-black text-[9px] uppercase transition-all ${manualQ.type === QuestionType.MULTIPLE_CHOICE ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>Trắc nghiệm</button>
                       <button onClick={() => setManualQ({...manualQ, type: QuestionType.ESSAY})} className={`flex-1 py-3 rounded-xl font-black text-[9px] uppercase transition-all ${manualQ.type === QuestionType.ESSAY ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>Tự luận</button>
@@ -140,7 +178,7 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
 
              {manualQ.type === QuestionType.MULTIPLE_CHOICE ? (
                 <div className="grid grid-cols-1 gap-3 bg-blue-50/30 p-6 rounded-[2.5rem] border border-blue-100/50">
-                   <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1 mb-1 block">Các phương án & Đáp án đúng</label>
+                   <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1 mb-1 block">Phương án & Đáp án đúng</label>
                    <div className="grid grid-cols-1 gap-2">
                       {manualQ.options.map((opt, i) => (
                         <div key={i} className="flex gap-2">
@@ -149,7 +187,7 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
                             value={opt} 
                             onChange={e => { const n = [...manualQ.options]; n[i] = e.target.value; setManualQ({...manualQ, options: n}); }} 
                             placeholder={`Phương án ${String.fromCharCode(65+i)}`} 
-                            className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-blue-500 text-sm font-medium" 
+                            className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-blue-500 text-sm font-medium shadow-sm transition-all" 
                           />
                           <button 
                             onClick={() => setManualQ({...manualQ, correctAnswer: opt})} 
@@ -163,12 +201,12 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
                 </div>
              ) : (
                 <div className="space-y-2 bg-purple-50/30 p-6 rounded-[2.5rem] border border-purple-100/50">
-                   <label className="text-[10px] font-black text-purple-600 uppercase tracking-widest ml-1 mb-1 block">Đáp án chuẩn / Gợi ý chấm điểm</label>
+                   <label className="text-[10px] font-black text-purple-600 uppercase tracking-widest ml-1 mb-1 block">Đáp án chuẩn / Gợi ý chấm</label>
                    <textarea 
                       value={manualQ.correctAnswer} 
                       onChange={e => setManualQ({...manualQ, correctAnswer: e.target.value})} 
-                      placeholder="Nhập nội dung đáp án chuẩn chi tiết..." 
-                      className="w-full h-32 p-5 bg-white border border-purple-100 rounded-2xl outline-none focus:border-purple-500 font-medium transition-all" 
+                      placeholder="Nhập nội dung đáp án chuẩn chi tiết để AI làm căn cứ chấm điểm..." 
+                      className="w-full h-32 p-5 bg-white border border-purple-100 rounded-2xl outline-none focus:border-purple-500 font-medium transition-all shadow-sm" 
                    />
                 </div>
              )}
@@ -176,7 +214,7 @@ const ManualCreatorTab: React.FC<ManualCreatorTabProps> = ({
              <button 
                onClick={handleAddManual} 
                disabled={isLoading}
-               className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95"
+               className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-blue-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
              >
                 <i className="fas fa-plus-circle"></i> THÊM VÀO GIỎ CÂU HỎI
              </button>

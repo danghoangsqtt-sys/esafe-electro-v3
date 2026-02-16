@@ -74,11 +74,22 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
         </button>
       </header>
       
-      <main className="flex-1 p-8 flex flex-col items-center justify-center max-w-4xl mx-auto w-full">
+      <main className="flex-1 p-8 flex flex-col items-center justify-center max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar">
         <div className="bg-white/5 p-10 rounded-[3rem] border border-white/10 w-full mb-10 shadow-2xl">
           <div className="text-2xl md:text-3xl font-black text-center leading-relaxed">
             {formatContent(currentQ.content)}
           </div>
+          
+          {/* Hiển thị ảnh minh họa của câu hỏi */}
+          {currentQ.image && (
+            <div className="mt-8 flex justify-center">
+                <img 
+                    src={currentQ.image} 
+                    alt="Minh họa câu hỏi" 
+                    className="max-h-72 rounded-2xl shadow-2xl object-contain border border-white/10" 
+                />
+            </div>
+          )}
         </div>
 
         {currentQ.type === QuestionType.MULTIPLE_CHOICE ? (
@@ -106,7 +117,7 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
               value={essayInput} 
               onChange={e => setEssayInput(e.target.value)} 
               placeholder="Nhập câu trả lời của bạn tại đây..."
-              className="w-full h-48 bg-white/5 border border-white/10 rounded-[2rem] p-8 text-lg font-medium outline-none focus:border-blue-500 transition-all resize-none" 
+              className="w-full h-48 bg-white/5 border border-white/10 rounded-[2rem] p-8 text-lg font-medium outline-none focus:border-blue-500 transition-all resize-none shadow-inner" 
             />
             <button 
               onClick={() => handleAnswer(essayInput)} 

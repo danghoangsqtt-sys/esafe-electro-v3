@@ -21,8 +21,9 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
 
-  // Edit State
+  // Modals States
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [viewingQuestion, setViewingQuestion] = useState<Question | null>(null);
 
   // Filtering Logic
   const filteredQuestions = useMemo(() => {
@@ -219,8 +220,16 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                       <div className="flex flex-wrap items-center gap-3">
                           <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1 rounded-full uppercase border border-blue-100">{q.category}</span>
                           <span className="text-[10px] font-black bg-green-50 text-green-600 px-3 py-1 rounded-full uppercase border border-green-100">{q.bloomLevel}</span>
+                          {q.image && (
+                              <span className="text-[10px] font-black bg-orange-50 text-orange-600 px-3 py-1 rounded-full uppercase border border-orange-100">
+                                  <i className="fas fa-image mr-1"></i> Đính kèm
+                              </span>
+                          )}
                       </div>
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button onClick={() => setViewingQuestion(q)} className="w-8 h-8 rounded-lg bg-gray-50 text-gray-600 hover:bg-slate-900 hover:text-white transition flex items-center justify-center" title="Xem chi tiết">
+                            <i className="fas fa-eye text-[10px]"></i>
+                         </button>
                          <button onClick={() => setEditingQuestion(q)} className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition flex items-center justify-center" title="Sửa câu hỏi">
                             <i className="fas fa-pen text-[10px]"></i>
                          </button>
@@ -230,33 +239,10 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
                       </div>
                    </div>
 
-                   <div className="font-bold text-gray-800 leading-relaxed text-lg mb-6">
+                   {/* Rút gọn nội dung: sử dụng line-clamp-3 */}
+                   <div className="font-bold text-gray-800 leading-relaxed text-lg mb-6 line-clamp-3 overflow-hidden text-ellipsis">
                      {formatContent(q.content)}
                    </div>
-                   
-                   {q.type === QuestionType.MULTIPLE_CHOICE && q.options && (
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-                           {q.options.map((opt, i) => (
-                               <div key={i} className={`text-sm p-4 rounded-2xl border transition-all ${opt === q.correctAnswer ? 'bg-green-50 border-green-200 text-green-700 font-bold ring-2 ring-green-100' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
-                                   <div className="flex items-center gap-3">
-                                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] shrink-0 ${opt === q.correctAnswer ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
-                                           {String.fromCharCode(65 + i)}
-                                       </span>
-                                       {formatContent(opt)}
-                                   </div>
-                               </div>
-                           ))}
-                       </div>
-                   )}
-
-                   {q.type === QuestionType.ESSAY && (
-                       <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 mb-6">
-                           <p className="text-[10px] font-black text-purple-600 uppercase mb-2">Đáp án mẫu / Gợi ý</p>
-                           <div className="text-sm text-purple-800 leading-relaxed italic">
-                             {formatContent(q.correctAnswer)}
-                           </div>
-                       </div>
-                   )}
                    
                    <div className="flex items-center justify-between pt-4 border-t border-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                        <span><i className="fas fa-folder text-yellow-500 mr-2"></i> {folders.find(f => f.id === q.folderId)?.name}</span>
@@ -268,10 +254,134 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({ questions, se
           )}
         </div>
 
-        {/* Edit Modal */}
+        {/* Modal: Xem chi tiết câu hỏi */}
+        {viewingQuestion && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden border border-gray-100">
+                    <header className="p-10 border-b border-gray-50 flex justify-between items-center bg-gray-50/20">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${viewingQuestion.type === QuestionType.MULTIPLE_CHOICE ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                                    {viewingQuestion.type === QuestionType.MULTIPLE_CHOICE ? 'Câu hỏi trắc nghiệm' : 'Câu hỏi tự luận'}
+                                </span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mã: {viewingQuestion.id.toUpperCase()}</span>
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-900">Chi tiết nội dung học thuật</h3>
+                        </div>
+                        <button onClick={() => setViewingQuestion(null)} className="w-12 h-12 rounded-full bg-white shadow-md border border-gray-100 text-gray-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all active:scale-95">
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                        {/* Nội dung câu hỏi đầy đủ */}
+                        <section className="space-y-4">
+                             <label className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] block">Nội dung câu hỏi</label>
+                             <div className="text-xl font-bold text-slate-800 leading-relaxed bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100">
+                                 {formatContent(viewingQuestion.content)}
+                             </div>
+                        </section>
+
+                        {/* Hình ảnh minh họa lớn */}
+                        {viewingQuestion.image && (
+                            <section className="space-y-4">
+                                <label className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em] block">Hình ảnh minh họa</label>
+                                <div className="bg-white p-4 rounded-[2.5rem] border border-slate-100 shadow-inner flex justify-center overflow-hidden">
+                                    <img src={viewingQuestion.image} className="max-h-96 object-contain rounded-2xl shadow-xl border border-slate-50" alt="Minh họa đầy đủ" />
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Các phương án (Nếu là trắc nghiệm) */}
+                        {viewingQuestion.type === QuestionType.MULTIPLE_CHOICE && viewingQuestion.options && (
+                            <section className="space-y-4">
+                                <label className="text-[10px] font-black text-green-600 uppercase tracking-[0.2em] block">Phương án lựa chọn</label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {viewingQuestion.options.map((opt, i) => (
+                                        <div key={i} className={`p-6 rounded-3xl border transition-all flex items-center gap-4 ${opt === viewingQuestion.correctAnswer ? 'bg-green-50 border-green-200 ring-2 ring-green-100 shadow-md shadow-green-100/50' : 'bg-white border-slate-100 text-slate-500'}`}>
+                                            <span className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs shrink-0 ${opt === viewingQuestion.correctAnswer ? 'bg-green-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}>
+                                                {String.fromCharCode(65 + i)}
+                                            </span>
+                                            <div className="font-bold flex-1">{formatContent(opt)}</div>
+                                            {opt === viewingQuestion.correctAnswer && <i className="fas fa-check-circle text-green-600 text-xl"></i>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Đáp án chuẩn (Nếu là tự luận) */}
+                        {viewingQuestion.type === QuestionType.ESSAY && (
+                            <section className="space-y-4">
+                                <label className="text-[10px] font-black text-purple-600 uppercase tracking-[0.2em] block">Đáp án mẫu / Căn cứ chấm điểm</label>
+                                <div className="bg-purple-50/50 p-8 rounded-[2rem] border border-purple-100 text-slate-700 leading-relaxed italic">
+                                    {formatContent(viewingQuestion.correctAnswer)}
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Giải thích bổ sung */}
+                        {viewingQuestion.explanation && (
+                            <section className="space-y-4">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block">Giải thích chi tiết</label>
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-sm text-slate-500 font-medium">
+                                    {formatContent(viewingQuestion.explanation)}
+                                </div>
+                            </section>
+                        )}
+
+                        {/* Metadata Footer */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-10 border-t border-slate-100">
+                             <div className="bg-gray-50 p-4 rounded-2xl flex items-center gap-4">
+                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm"><i className="fas fa-brain"></i></div>
+                                 <div>
+                                     <p className="text-[9px] font-black text-slate-400 uppercase">Mức độ Bloom</p>
+                                     <p className="text-xs font-black text-slate-700">{viewingQuestion.bloomLevel}</p>
+                                 </div>
+                             </div>
+                             <div className="bg-gray-50 p-4 rounded-2xl flex items-center gap-4">
+                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-yellow-500 shadow-sm"><i className="fas fa-folder"></i></div>
+                                 <div>
+                                     <p className="text-[9px] font-black text-slate-400 uppercase">Thư mục bài</p>
+                                     <p className="text-xs font-black text-slate-700 truncate max-w-[120px]">{folders.find(f => f.id === viewingQuestion.folderId)?.name}</p>
+                                 </div>
+                             </div>
+                             <div className="bg-gray-50 p-4 rounded-2xl flex items-center gap-4">
+                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-500 shadow-sm"><i className="fas fa-calendar-alt"></i></div>
+                                 <div>
+                                     <p className="text-[9px] font-black text-slate-400 uppercase">Ngày khởi tạo</p>
+                                     <p className="text-xs font-black text-slate-700">{new Date(viewingQuestion.createdAt).toLocaleDateString('vi-VN')}</p>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <footer className="p-10 border-t border-gray-50 bg-gray-50/30 flex justify-end gap-4 shrink-0">
+                        <button 
+                            onClick={() => setViewingQuestion(null)} 
+                            className="px-8 py-3.5 bg-white border border-slate-200 text-slate-500 rounded-2xl font-bold hover:bg-slate-50 transition-all"
+                        >
+                            Đóng cửa sổ
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const q = viewingQuestion;
+                                setViewingQuestion(null);
+                                setEditingQuestion(q);
+                            }} 
+                            className="px-10 py-3.5 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-600/20 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                        >
+                            <i className="fas fa-pen-to-square"></i> SỬA CÂU HỎI
+                        </button>
+                    </footer>
+                </div>
+            </div>
+        )}
+
+        {/* Modal: Chỉnh sửa câu hỏi (Edit Mode) */}
         {editingQuestion && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in">
-                <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden border border-gray-100">
+                <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden border border-gray-100">
                     <header className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
                         <div>
                             <h3 className="text-2xl font-black text-gray-800">Chỉnh sửa câu hỏi</h3>
