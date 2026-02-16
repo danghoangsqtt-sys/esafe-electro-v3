@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Question, QuestionType } from '../../types';
+import React, { useState } from 'react';
+import { Question } from '../../types';
 import { formatContent } from '../../utils/textFormatter';
 
 interface MillionaireGameProps {
@@ -81,12 +81,13 @@ const MillionaireGame: React.FC<MillionaireGameProps> = ({ questions, onExit }) 
                   <div className="text-2xl md:text-3xl font-black leading-tight text-blue-50">
                     {formatContent(currentQ.content)}
                   </div>
-                  {currentQ.image && (
+                  {/* Hiển thị ảnh minh họa */}
+                  {(currentQ.image || currentQ.imageUrl) && (
                     <div className="mt-8 flex justify-center">
                         <img 
-                            src={currentQ.image} 
-                            alt="Sơ đồ" 
-                            className="max-h-60 rounded-2xl shadow-2xl border border-white/10 object-contain" 
+                            src={currentQ.image || currentQ.imageUrl} 
+                            alt="Sơ đồ minh họa" 
+                            className="max-h-64 object-contain rounded-xl mx-auto my-4 shadow-md border border-white/10" 
                         />
                     </div>
                   )}
@@ -127,7 +128,7 @@ const MillionaireGame: React.FC<MillionaireGameProps> = ({ questions, onExit }) 
           )}
       </main>
 
-      {/* Money Sidebar (Hidden on small screens) */}
+      {/* Money Sidebar */}
       <div className="hidden lg:flex fixed right-10 top-1/2 -translate-y-1/2 flex-col-reverse gap-2 bg-slate-900/50 p-6 rounded-[3rem] border border-white/5 backdrop-blur-md">
           {MONEY_PYRAMID.map((m, i) => (
               <div key={i} className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${currentIdx === i ? 'bg-orange-500 text-white scale-110 shadow-lg' : i < currentIdx ? 'text-green-500 opacity-40' : 'text-slate-500'}`}>

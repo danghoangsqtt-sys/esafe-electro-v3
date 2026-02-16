@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Question, QuestionType } from '../../types';
 import { formatContent } from '../../utils/textFormatter';
 import SummaryReview from './shared/SummaryReview';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 
 interface TimedChallengeGameProps {
   questions: Question[];
@@ -17,12 +18,25 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
   const [essayInput, setEssayInput] = useState('');
   const timerRef = useRef<any>(null);
 
+  // Tích hợp hook giọng nói cho các câu tự luận nếu cần (hoặc nhập liệu văn bản)
+  const { 
+    isRecording, 
+    transcript, 
+    toggleRecording, 
+    stopRecording, 
+    resetTranscript 
+  } = useSpeechRecognition('vi-VN');
+
   useEffect(() => {
     if (gameState === 'PLAYING') {
       startTimer();
     }
     return () => clearInterval(timerRef.current);
   }, [currentIdx, gameState]);
+
+  useEffect(() => {
+    if (transcript) setEssayInput(transcript);
+  }, [transcript]);
 
   const startTimer = () => {
     clearInterval(timerRef.current);
@@ -40,6 +54,8 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
   const handleAnswer = (val: any) => {
     const nextAnswers = [...userAnswers, val];
     setUserAnswers(nextAnswers);
+    stopRecording();
+    resetTranscript();
     
     if (currentIdx + 1 < questions.length) {
       setCurrentIdx(prev => prev + 1);
@@ -75,18 +91,18 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
       </header>
       
       <main className="flex-1 p-8 flex flex-col items-center justify-center max-w-4xl mx-auto w-full overflow-y-auto custom-scrollbar">
-        <div className="bg-white/5 p-10 rounded-[3rem] border border-white/10 w-full mb-10 shadow-2xl">
+        <div className="bg-white/5 p-10 rounded-[3rem] border border-white/10 w-full mb-10 shadow-2xl relative">
           <div className="text-2xl md:text-3xl font-black text-center leading-relaxed">
             {formatContent(currentQ.content)}
           </div>
           
-          {/* Hiển thị ảnh minh họa của câu hỏi */}
-          {currentQ.image && (
+          {/* Hiển thị ảnh minh họa */}
+          {(currentQ.image || currentQ.imageUrl) && (
             <div className="mt-8 flex justify-center">
                 <img 
-                    src={currentQ.image} 
+                    src={currentQ.image || currentQ.imageUrl} 
                     alt="Minh họa câu hỏi" 
-                    className="max-h-72 rounded-2xl shadow-2xl object-contain border border-white/10" 
+                    className="max-h-64 object-contain rounded-xl mx-auto my-4 shadow-md border border-white/10" 
                 />
             </div>
           )}
@@ -113,12 +129,20 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
           </div>
         ) : (
           <div className="w-full space-y-6">
-            <textarea 
-              value={essayInput} 
-              onChange={e => setEssayInput(e.target.value)} 
-              placeholder="Nhập câu trả lời của bạn tại đây..."
-              className="w-full h-48 bg-white/5 border border-white/10 rounded-[2rem] p-8 text-lg font-medium outline-none focus:border-blue-500 transition-all resize-none shadow-inner" 
-            />
+            <div className="relative">
+              <textarea 
+                value={essayInput} 
+                onChange={e => setEssayInput(e.target.value)} 
+                placeholder="Nhập câu trả lời hoặc nhấn Mic để nói..."
+                className="w-full h-48 bg-white/5 border border-white/10 rounded-[2rem] p-8 text-lg font-medium outline-none focus:border-blue-500 transition-all resize-none shadow-inner" 
+              />
+              <button 
+                onClick={toggleRecording}
+                className={`absolute bottom-6 right-6 w-12 h-12 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-600'}`}
+              >
+                <i className={`fas ${isRecording ? 'fa-stop' : 'fa-microphone'}`}></i>
+              </button>
+            </div>
             <button 
               onClick={() => handleAnswer(essayInput)} 
               className="w-full py-5 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all active:scale-95"
