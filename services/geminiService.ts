@@ -141,8 +141,13 @@ export const generateQuestionsByAI = async (
         temperature: 0.8,
       },
     });
-    
-    return JSON.parse(response.text || "[]");
+    const rawText = response.text || "[]";
+    try {
+      return JSON.parse(rawText);
+    } catch (parseError) {
+      console.error("[AI-PARSE-ERROR] Response is not valid JSON:", rawText.substring(0, 200));
+      return [];
+    }
   } catch (error: any) {
     throw error;
   }
@@ -172,7 +177,13 @@ export const evaluateOralAnswer = async (
               }
           }
       });
-      return JSON.parse(response.text || "{}");
+      const rawText = response.text || "{}";
+      try {
+        return JSON.parse(rawText);
+      } catch (parseError) {
+        console.error("[AI-PARSE-ERROR] Evaluation response is not valid JSON:", rawText.substring(0, 200));
+        return { score: 0, feedback: "Lỗi hệ thống: AI trả về dữ liệu không hợp lệ." };
+      }
     } catch (error: any) {
       throw error;
     }

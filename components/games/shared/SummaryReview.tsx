@@ -6,15 +6,19 @@ import { formatContent } from '../../../utils/textFormatter';
 interface SummaryReviewProps {
   questions: Question[];
   userAnswers: any[];
+  textAnswers?: string[]; // Câu trả lời dạng văn bản (từ OralGame)
   onExit: () => void;
 }
 
-const SummaryReview: React.FC<SummaryReviewProps> = ({ questions, userAnswers, onExit }) => {
+const SummaryReview: React.FC<SummaryReviewProps> = ({ questions, userAnswers, textAnswers, onExit }) => {
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6 p-6 animate-fade-in pb-20">
       <h3 className="text-2xl font-black text-white text-center mb-8 uppercase tracking-widest">Xem lại kết quả</h3>
       {questions.map((q, idx) => {
-        const isCorrect = userAnswers[idx] === q.correctAnswer || (typeof userAnswers[idx] === 'number' && userAnswers[idx] >= 5);
+        const answer = userAnswers[idx];
+        const isScore = typeof answer === 'number';
+        const isCorrect = isScore ? answer >= 5 : answer === q.correctAnswer;
+
         return (
           <div key={idx} className={`p-6 rounded-[2rem] border transition-all ${isCorrect ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
             <div className="flex justify-between items-center mb-4">
@@ -32,9 +36,19 @@ const SummaryReview: React.FC<SummaryReviewProps> = ({ questions, userAnswers, o
               <div className="text-xs">
                 <span className="text-slate-400 uppercase font-black tracking-tighter mr-2">Bạn chọn:</span>
                 <span className="text-white font-medium">
-                  {typeof userAnswers[idx] === 'number' ? `(Chấm điểm AI: ${userAnswers[idx]}/10)` : userAnswers[idx] || "Bỏ trống"}
+                  {isScore 
+                    ? `(Chấm điểm AI: ${answer}/10)` 
+                    : (answer || "Bỏ trống")
+                  }
                 </span>
               </div>
+              {/* Hiển thị nội dung câu trả lời văn bản từ OralGame nếu có */}
+              {textAnswers && textAnswers[idx] && (
+                <div className="text-xs mt-1">
+                  <span className="text-blue-400 uppercase font-black tracking-tighter mr-2">Trả lời:</span>
+                  <span className="text-slate-300 font-medium italic">"{textAnswers[idx]}"</span>
+                </div>
+              )}
               <div className="text-xs">
                 <span className="text-green-400 uppercase font-black tracking-tighter mr-2">Đáp án đúng:</span>
                 <span className="text-green-300 font-bold">{q.correctAnswer}</span>

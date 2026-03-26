@@ -78,6 +78,17 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
           throw new Error("Tệp không đúng định dạng sao lưu của Hệ thống LMS.");
         }
 
+        // Validate schema cơ bản trước khi ghi đè
+        if (data.questions && !Array.isArray(data.questions)) {
+          throw new Error("Dữ liệu 'questions' không hợp lệ (phải là mảng).");
+        }
+        if (data.folders && !Array.isArray(data.folders)) {
+          throw new Error("Dữ liệu 'folders' không hợp lệ (phải là mảng).");
+        }
+        if (data.knowledgeBase && !Array.isArray(data.knowledgeBase)) {
+          throw new Error("Dữ liệu 'knowledgeBase' không hợp lệ (phải là mảng).");
+        }
+
         if (window.confirm("CẢNH BÁO: Hành động này sẽ thay thế toàn bộ dữ liệu hiện tại bằng dữ liệu từ bản sao lưu. Tiếp tục?")) {
           if (data.questions) localStorage.setItem('questions', JSON.stringify(data.questions));
           if (data.folders) localStorage.setItem('question_folders', JSON.stringify(data.folders));

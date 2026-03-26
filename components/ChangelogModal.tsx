@@ -15,7 +15,8 @@ const ChangelogModal: React.FC = () => {
     // Sử dụng fetch thay vì import trực tiếp để tránh lỗi module specifier JSON
     const loadVersionData = async () => {
       try {
-        const response = await fetch('./version.json');
+        const basePath = typeof import.meta !== 'undefined' && (import.meta as any).env?.BASE_URL || './';
+        const response = await fetch(`${basePath}version.json`);
         if (!response.ok) throw new Error('Không thể tải tệp phiên bản');
         const json: VersionData = await response.json();
         setData(json);

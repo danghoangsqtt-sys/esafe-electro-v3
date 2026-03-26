@@ -74,6 +74,10 @@ function createWindow() {
     show: false, // Ẩn cho đến khi load xong để tránh màn hình trắng
     backgroundColor: '#0f172a',
     webPreferences: {
+      // ⚠️ CẢNH BÁO BẢO MẬT: Cấu hình hiện tại KHÔNG AN TOÀN cho production.
+      // nodeIntegration + contextIsolation:false cho phép bất kỳ XSS nào chạy Node.js code.
+      // TODO: Chuyển sang contextBridge + preload.js trước khi phát hành bản chính thức.
+      // Xem: https://www.electronjs.org/docs/tutorial/context-isolation
       nodeIntegration: true,
       contextIsolation: false,
       webSecurity: false, // Quan trọng để load file:// và tài nguyên local

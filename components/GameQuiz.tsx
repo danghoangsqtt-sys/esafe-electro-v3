@@ -1,10 +1,28 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Question, QuestionType, QuestionFolder } from '../types';
 import TimedChallengeGame from './games/TimedChallengeGame';
 import OralGame from './games/OralGame';
 import FlashcardGame from './games/FlashcardGame';
 import MillionaireGame from './games/MillionaireGame';
+
+// Fisher-Yates shuffle — thuật toán xáo trộn ổn định, không phụ thuộc vào sort comparator
+function shuffleArray<T>(arr: T[]): T[] {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Bảng ánh xạ màu tĩnh để Tailwind JIT có thể phát hiện và sinh CSS đúng
+const COLOR_MAP: Record<string, { bg: string; text: string; border: string }> = {
+  orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100' },
+  blue:   { bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-100' },
+  green:  { bg: 'bg-green-50',  text: 'text-green-600',  border: 'border-green-100' },
+  purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100' },
+};
 
 interface PlayerProfile {
   name: string;
@@ -31,6 +49,9 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
   const [inputName, setInputName] = useState('');
   const [inputClass, setInputClass] = useState('');
 
+  // Dùng ref để lưu seed ngẫu nhiên, chỉ xáo trộn khi người dùng bấm vào game mode
+  const shuffleSeedRef = useRef(0);
+
   // Lọc câu hỏi dựa trên cài đặt tại Lobby
   const filteredQuestions = useMemo(() => {
     let base = selectedFolderIds.includes('all') 
@@ -41,8 +62,10 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
       base = base.filter(q => q.type === QuestionType.ESSAY);
     }
     
-    return [...base].sort(() => 0.5 - Math.random()).slice(0, questionLimit);
-  }, [questions, selectedFolderIds, questionLimit, mode]);
+    // Dùng Fisher-Yates shuffle thay vì sort(() => 0.5 - Math.random())
+    return shuffleArray(base).slice(0, questionLimit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questions, selectedFolderIds, questionLimit, mode, shuffleSeedRef.current]);
 
   const handleStartGaming = () => {
     if (inputName.trim() && inputClass.trim()) {
@@ -260,25 +283,37 @@ const GameQuiz: React.FC<GameQuizProps> = ({ questions, folders }) => {
   );
 };
 
-const GameCard = ({ onClick, icon, color, title, description, available }: any) => (
-  <button 
-    onClick={onClick}
-    disabled={!available}
-    className={`group p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-left transition-all hover:shadow-2xl hover:scale-[1.02] active:scale-95 flex flex-col items-start h-full disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed`}
-  >
-    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-8 text-2xl transition-all group-hover:rotate-12 bg-${color}-50 text-${color}-600 border border-${color}-100`}>
-      <i className={`fas ${icon}`}></i>
-    </div>
-    <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight leading-none">{title}</h3>
-    <p className="text-slate-500 text-sm font-medium leading-relaxed mb-8 flex-1">{description}</p>
-    <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${available ? `text-${color}-600` : 'text-slate-400'}`}>
-       {available ? (
-         <>CHƠI NGAY <i className="fas fa-arrow-right animate-bounce-x"></i></>
-       ) : (
-         <>CHƯA ĐỦ CÂU HỎI <i className="fas fa-lock"></i></>
-       )}
-    </div>
-  </button>
-);
+interface GameCardProps {
+  onClick: () => void;
+  icon: string;
+  color: string;
+  title: string;
+  description: string;
+  available: boolean;
+}
+
+const GameCard: React.FC<GameCardProps> = ({ onClick, icon, color, title, description, available }) => {
+  const colors = COLOR_MAP[color] || COLOR_MAP['blue'];
+  return (
+    <button 
+      onClick={onClick}
+      disabled={!available}
+      className={`group p-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm text-left transition-all hover:shadow-2xl hover:scale-[1.02] active:scale-95 flex flex-col items-start h-full disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed`}
+    >
+      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-8 text-2xl transition-all group-hover:rotate-12 ${colors.bg} ${colors.text} border ${colors.border}`}>
+        <i className={`fas ${icon}`}></i>
+      </div>
+      <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight leading-none">{title}</h3>
+      <p className="text-slate-500 text-sm font-medium leading-relaxed mb-8 flex-1">{description}</p>
+      <div className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${available ? colors.text : 'text-slate-400'}`}>
+         {available ? (
+           <>CHƠI NGAY <i className="fas fa-arrow-right animate-bounce-x"></i></>
+         ) : (
+           <>CHƯA ĐỦ CÂU HỎI <i className="fas fa-lock"></i></>
+         )}
+      </div>
+    </button>
+  );
+};
 
 export default GameQuiz;

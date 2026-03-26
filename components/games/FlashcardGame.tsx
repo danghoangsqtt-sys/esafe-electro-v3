@@ -26,6 +26,20 @@ const FlashcardGame: React.FC<FlashcardGameProps> = ({ questions, onExit }) => {
     }, 150);
   };
 
+  // Guard: nếu không có câu hỏi thì hiển thị thông báo
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-full bg-slate-950 text-white flex flex-col items-center justify-center font-inter gap-8">
+        <i className="fas fa-exclamation-triangle text-6xl text-yellow-500"></i>
+        <h2 className="text-2xl font-black">Không có câu hỏi nào</h2>
+        <p className="text-slate-400">Vui lòng chọn chủ đề có câu hỏi ở Lobby.</p>
+        <button onClick={onExit} className="px-10 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all">
+          Quay lại
+        </button>
+      </div>
+    );
+  }
+
   const currentQ = questions[currentIdx];
 
   return (

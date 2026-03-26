@@ -53,10 +53,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ temperature, maxTokens, aiVoice = 'Ko
     setIsLoading(true);
 
     try {
-        const history = messages.map(m => ({
-            role: m.role,
-            parts: [{ text: m.text }]
-        }));
+        const history = messages
+            .filter(m => m.id !== 'welcome') // Loại bỏ welcome message giả khỏi history
+            .map(m => ({
+                role: m.role,
+                parts: [{ text: m.text }]
+            }));
 
         const response = await generateChatResponse(
             history, 
@@ -71,7 +73,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ temperature, maxTokens, aiVoice = 'Ko
             text: response.text || "Xin lỗi, DHsystem AI hiện chưa tìm thấy thông tin phù hợp.",
             timestamp: Date.now(),
             sources: response.sources,
-            isRAG: response.sources.some(s => s.title.includes('Giáo trình'))
+            isRAG: response.sources.some(s => s.title.includes('Tri thức nội bộ') || s.title.includes('Giáo trình'))
         };
         
         setMessages((prev) => [...prev, modelMsg]);

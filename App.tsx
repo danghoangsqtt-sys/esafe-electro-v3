@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Chatbot from './components/Chatbot';
 import QuestionGenerator from './components/QuestionGenerator/index'; 
@@ -12,6 +12,21 @@ import ChangelogModal from './components/ChangelogModal';
 import NewsSection from './components/NewsSection';
 import { Question, VectorChunk, QuestionFolder, Exam } from './types';
 import pkg from './package.json';
+
+// Static color maps để Tailwind JIT sinh CSS đúng
+const STAT_COLOR_MAP: Record<string, { bg: string; text: string; border: string }> = {
+  blue:   { bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-100/50' },
+  indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100/50' },
+  orange: { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100/50' },
+  purple: { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100/50' },
+};
+
+const NOTIFY_COLOR_MAP: Record<string, { border: string; bg: string }> = {
+  success: { border: 'border-green-100', bg: 'bg-green-50' },
+  error:   { border: 'border-red-100',   bg: 'bg-red-50' },
+  info:    { border: 'border-blue-100',  bg: 'bg-blue-50' },
+  warning: { border: 'border-yellow-100', bg: 'bg-yellow-50' },
+};
 
 // Sử dụng Window augmentation từ types.ts để truy cập require một cách an toàn
 const ipcRenderer = typeof window !== 'undefined' && window.require 
@@ -36,7 +51,14 @@ const SidebarLink = ({ to, icon, label }: { to: string, icon: string, label: str
   );
 };
 
-const Dashboard = ({ questions, knowledgeBase, exams }: any) => {
+interface DashboardProps {
+  questions: Question[];
+  folders: QuestionFolder[];
+  exams: Exam[];
+  docCount: number;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ questions, folders, exams, docCount }) => {
     return (
         <div className="p-8 space-y-12 animate-fade-in max-w-7xl mx-auto pb-20">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 bg-white p-12 rounded-[3.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
@@ -66,8 +88,8 @@ const Dashboard = ({ questions, knowledgeBase, exams }: any) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 <StatCard icon="fa-database" color="blue" label="Kho câu hỏi" value={questions.length} unit="Câu hỏi" />
                 <StatCard icon="fa-file-invoice" color="indigo" label="Ngân hàng đề" value={exams?.length || 0} unit="Đề thi" />
-                <StatCard icon="fa-layer-group" color="orange" label="Chuyên đề học tập" value={JSON.parse(localStorage.getItem('question_folders') || '[]').length} unit="Chủ đề" />
-                <StatCard icon="fa-file-pdf" color="purple" label="Kho giáo trình" value={JSON.parse(localStorage.getItem('elearning_docs') || '[]').length} unit="Tài liệu" />
+                <StatCard icon="fa-layer-group" color="orange" label="Chuyên đề học tập" value={folders.length} unit="Chủ đề" />
+                <StatCard icon="fa-file-pdf" color="purple" label="Kho giáo trình" value={docCount} unit="Tài liệu" />
             </div>
 
             <div className="mt-10">
@@ -77,18 +99,29 @@ const Dashboard = ({ questions, knowledgeBase, exams }: any) => {
     );
 };
 
-const StatCard = ({ icon, color, label, value, unit }: any) => (
-    <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 text-xl bg-${color}-50 text-${color}-600 border border-${color}-100/50`}>
-            <i className={`fas ${icon}`}></i>
+interface StatCardProps {
+  icon: string;
+  color: string;
+  label: string;
+  value: number;
+  unit: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ icon, color, label, value, unit }) => {
+    const colors = STAT_COLOR_MAP[color] || STAT_COLOR_MAP['blue'];
+    return (
+        <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm transition-all hover:shadow-xl group">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 text-xl ${colors.bg} ${colors.text} border ${colors.border}`}>
+                <i className={`fas ${icon}`}></i>
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+            <div className="flex items-end gap-2 mt-2">
+                <p className="text-4xl font-black text-slate-900 tracking-tighter">{value}</p>
+                <p className="text-xs font-bold text-slate-400 mb-1.5">{unit}</p>
+            </div>
         </div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-        <div className="flex items-end gap-2 mt-2">
-            <p className="text-4xl font-black text-slate-900 tracking-tighter">{value}</p>
-            <p className="text-xs font-bold text-slate-400 mb-1.5">{unit}</p>
-        </div>
-    </div>
-);
+    );
+};
 
 const App: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -121,6 +154,9 @@ const App: React.FC = () => {
     initData();
   }, []);
 
+  // Debounce timer ref để tránh ghi persistence quá thường xuyên
+  const saveTimerRef = useRef<any>(null);
+
   useEffect(() => {
     if (!isDataLoaded) return;
     localStorage.setItem('questions', JSON.stringify(questions));
@@ -128,8 +164,12 @@ const App: React.FC = () => {
     localStorage.setItem('knowledge_base', JSON.stringify(knowledgeBase));
     localStorage.setItem('exams', JSON.stringify(exams));
     
+    // Debounce IPC save 500ms để giảm tải khi import hàng loạt
     if (ipcRenderer) {
-      ipcRenderer.invoke('save-database', { questions, folders, knowledgeBase, exams, lastSync: Date.now() });
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        ipcRenderer.invoke('save-database', { questions, folders, knowledgeBase, exams, lastSync: Date.now() });
+      }, 500);
     }
   }, [questions, folders, knowledgeBase, exams, isDataLoaded]);
 
@@ -153,14 +193,17 @@ const App: React.FC = () => {
         <ChangelogModal />
         
         <div className="fixed top-8 right-8 z-[100] space-y-3 pointer-events-none">
-            {notifications.map(n => (
-                <div key={n.id} className={`px-6 py-4 rounded-3xl shadow-2xl border flex items-center gap-4 animate-fade-in-up pointer-events-auto bg-white min-w-[320px] border-${n.type === 'success' ? 'green' : n.type === 'error' ? 'red' : 'blue'}-100`}>
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center bg-${n.type === 'success' ? 'green' : n.type === 'error' ? 'red' : 'blue'}-50`}>
-                        <i className={`fas ${n.type === 'success' ? 'fa-check-circle text-green-500' : n.type === 'error' ? 'fa-triangle-exclamation text-red-500' : 'fa-info-circle text-blue-500'}`}></i>
+            {notifications.map(n => {
+                const nColors = NOTIFY_COLOR_MAP[n.type] || NOTIFY_COLOR_MAP['info'];
+                return (
+                    <div key={n.id} className={`px-6 py-4 rounded-3xl shadow-2xl border flex items-center gap-4 animate-fade-in-up pointer-events-auto bg-white min-w-[320px] ${nColors.border}`}>
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${nColors.bg}`}>
+                            <i className={`fas ${n.type === 'success' ? 'fa-check-circle text-green-500' : n.type === 'error' ? 'fa-triangle-exclamation text-red-500' : 'fa-info-circle text-blue-500'}`}></i>
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">{n.message}</span>
                     </div>
-                    <span className="text-sm font-bold text-slate-700">{n.message}</span>
-                </div>
-            ))}
+                );
+            })}
         </div>
 
         <aside className="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 z-20 shadow-sm overflow-hidden">
@@ -206,7 +249,7 @@ const App: React.FC = () => {
             ) : (
               <div className="flex-1 overflow-auto custom-scrollbar">
                   <Routes>
-                      <Route path="/" element={<Dashboard questions={questions} knowledgeBase={knowledgeBase} exams={exams} />} />
+                      <Route path="/" element={<Dashboard questions={questions} folders={folders} exams={exams} docCount={JSON.parse(localStorage.getItem('elearning_docs') || '[]').length} />} />
                       <Route path="/documents" element={<Documents onUpdateKnowledgeBase={updateKnowledgeBase} onDeleteDocumentData={deleteKnowledgeByDocId} onNotify={showNotify} />} />
                       <Route path="/generate" element={<QuestionGenerator folders={folders} onSaveQuestions={(q)=>setQuestions(p=>[...p,...q])} onNotify={showNotify}/>} />
                       <Route path="/bank" element={<QuestionBankManager questions={questions} setQuestions={setQuestions} folders={folders} setFolders={setFolders} exams={exams} setExams={setExams} showNotify={showNotify} />} />

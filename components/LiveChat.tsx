@@ -156,6 +156,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
       const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
       const workletUrl = URL.createObjectURL(blob);
       await inputContextRef.current.audioWorklet.addModule(workletUrl);
+      URL.revokeObjectURL(workletUrl); // Giải phóng ObjectURL sau khi đã load xong
 
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -193,7 +194,8 @@ const LiveChat: React.FC<LiveChatProps> = ({ voiceName = 'Kore', onClose }) => {
                 workletNode.connect(inputContextRef.current.destination);
             },
             onmessage: async (message: LiveServerMessage) => {
-                const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+                const parts = message.serverContent?.modelTurn?.parts;
+                const base64Audio = parts && parts.length > 0 ? parts[0]?.inlineData?.data : undefined;
                 if (base64Audio) {
                     if (audioContextRef.current) {
                         /* Schedule gapless audio playback per guidelines */

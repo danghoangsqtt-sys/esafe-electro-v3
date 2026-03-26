@@ -6,10 +6,20 @@ import React from 'react';
  */
 const sanitizeHTML = (html: string): string => {
   return html
-    .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, "") // Xóa thẻ script
-    .replace(/<iframe\b[^>]*>([\s\S]*?)<\/iframe>/gim, "") // Xóa thẻ iframe
-    .replace(/on\w+="[^"]*"/gim, "") // Xóa các event attributes như onclick, onload
-    .replace(/javascript:[^"]*/gim, ""); // Xóa javascript: pseudo-protocol
+    // Xóa các thẻ nguy hiểm (script, iframe, object, embed, form, svg chứa script)
+    .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, "")
+    .replace(/<iframe\b[^>]*>([\s\S]*?)<\/iframe>/gim, "")
+    .replace(/<object\b[^>]*>([\s\S]*?)<\/object>/gim, "")
+    .replace(/<embed\b[^>]*>/gim, "")
+    .replace(/<form\b[^>]*>([\s\S]*?)<\/form>/gim, "")
+    // Xóa các event attributes (onclick, onload, onerror, v.v.)
+    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gim, "")
+    // Xóa javascript:, vbscript:, data: pseudo-protocols (kể cả khi encoded)
+    .replace(/(?:java|vb)script\s*:/gim, "")
+    .replace(/data\s*:\s*(?:text|image)\/(?:html|svg)/gim, "")
+    // Xóa style expressions nguy hiểm (expression, url trong style)
+    .replace(/expression\s*\(/gim, "")
+    .replace(/url\s*\(\s*(?:"|')?javascript:/gim, "");
 };
 
 /**

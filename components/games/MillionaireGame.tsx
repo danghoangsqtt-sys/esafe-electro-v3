@@ -32,14 +32,19 @@ const MillionaireGame: React.FC<MillionaireGameProps> = ({ questions, onExit }) 
   const [hiddenOptions, setHiddenOptions] = useState<string[]>([]);
   const [activeLifeline, setActiveLifeline] = useState<{ type: LifelineType, data: any } | null>(null);
 
-  // Logic tính tiền thưởng đã đạt được
+  // Logic tính tiền thưởng đã đạt được — clamp index để tránh vượt ngoài mảng
   const achievedPrize = useMemo(() => {
     if (currentIdx === 0) return "0";
-    return MONEY_PYRAMID[MONEY_PYRAMID.length - currentIdx];
+    const prizeIdx = Math.max(0, Math.min(MONEY_PYRAMID.length - 1, MONEY_PYRAMID.length - currentIdx));
+    return MONEY_PYRAMID[prizeIdx];
   }, [currentIdx]);
+
+  // Tổng số câu hỏi thực tế cho game (giới hạn bởi cả questions và kim tự tháp)
+  const totalGameQuestions = Math.min(questions.length, MONEY_PYRAMID.length);
 
   // Get current question with safety fallback
   const currentQ = useMemo(() => {
+    if (questions.length === 0) return null;
     const q = questions[currentIdx] || questions[0];
     const options = q.options && q.options.length >= 4 ? q.options : ['A', 'B', 'C', 'D'];
     return { ...q, options };
@@ -63,7 +68,7 @@ const MillionaireGame: React.FC<MillionaireGameProps> = ({ questions, onExit }) 
 
   const handleNextQuestion = () => {
     setShowResultModal(false);
-    if (currentIdx + 1 < questions.length && currentIdx + 1 < MONEY_PYRAMID.length) {
+    if (currentIdx + 1 < totalGameQuestions) {
         setCurrentIdx(prev => prev + 1);
         setSelectedAns(null);
         setHiddenOptions([]);
@@ -109,6 +114,20 @@ const MillionaireGame: React.FC<MillionaireGameProps> = ({ questions, onExit }) 
       setActiveLifeline({ type, data: team });
     }
   };
+
+  // Guard: không có câu hỏi hoặc currentQ null
+  if (!currentQ || questions.length === 0) {
+    return (
+      <div className="min-h-full bg-[#020b2c] flex flex-col items-center justify-center text-center p-10 space-y-8 animate-fade-in">
+        <i className="fas fa-exclamation-triangle text-6xl text-yellow-500"></i>
+        <h2 className="text-2xl font-black text-white">Không đủ câu hỏi trắc nghiệm</h2>
+        <p className="text-slate-400">Chế độ "Ai là triệu phú" cần ít nhất 10 câu trắc nghiệm.</p>
+        <button onClick={onExit} className="px-10 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all">
+          Quay lại
+        </button>
+      </div>
+    );
+  }
 
   if (gameState === 'WIN') {
     return (
@@ -210,7 +229,8 @@ const MillionaireGame: React.FC<MillionaireGameProps> = ({ questions, onExit }) 
                             key={i} 
                             onClick={() => handleSelect(opt)}
                             disabled={gameState !== 'PLAYING' || isHidden}
-                            className={`py-4 px-8 border-2 transition-all text-left flex items-center gap-5 group relative rounded-2xl min-h-[90px] h-auto whitespace-normal break-words ${btnStyle} ${isHidden ? 'opacity-0 pointer-events-none translate-y-4' : 'animate-fade-in-up hover:scale-[1.01]'} [animation-delay:${i*0.1}s]`}
+                            className={`py-4 px-8 border-2 transition-all text-left flex items-center gap-5 group relative rounded-2xl min-h-[90px] h-auto whitespace-normal break-words ${btnStyle} ${isHidden ? 'opacity-0 pointer-events-none translate-y-4' : 'animate-fade-in-up hover:scale-[1.01]'}`}
+                            style={{ animationDelay: `${i * 0.1}s` }}
                         >
                             <span className="text-yellow-500 font-black text-sm shrink-0 border-r border-white/10 pr-4">{letter}</span>
                             <div className="font-bold text-sm md:text-base flex-1 leading-tight py-1">

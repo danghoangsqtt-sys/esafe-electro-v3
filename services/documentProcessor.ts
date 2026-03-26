@@ -123,6 +123,9 @@ export const embedChunks = async (
   const ai = new GoogleGenAI({ apiKey });
   const vectorChunks: VectorChunk[] = [];
 
+  const MAX_RETRIES = 3;
+  const retryCounts: Record<number, number> = {};
+
   for (let i = 0; i < textChunks.length; i++) {
     try {
       const response = await ai.models.embedContent({
@@ -132,17 +135,24 @@ export const embedChunks = async (
       const embedding = response.embeddings?.[0];
       if (embedding?.values) {
         vectorChunks.push({
-          id: Math.random().toString(36).substring(7),
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
           docId: docId,
           text: textChunks[i],
           embedding: embedding.values
         });
       }
+      // Reset retry count khi thành công
+      delete retryCounts[i];
     } catch (e: any) {
       if (e.toString().includes('429')) {
-        await new Promise(r => setTimeout(r, 4500));
-        i--;
-        continue;
+        retryCounts[i] = (retryCounts[i] || 0) + 1;
+        if (retryCounts[i] <= MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, 4500 * retryCounts[i])); // Exponential backoff
+          i--;
+          continue;
+        } else {
+          console.warn(`[EMBED] Skipping chunk ${i} after ${MAX_RETRIES} retries (rate limit).`);
+        }
       }
     }
     if (onProgress) onProgress(Math.round(((i + 1) / textChunks.length) * 100));

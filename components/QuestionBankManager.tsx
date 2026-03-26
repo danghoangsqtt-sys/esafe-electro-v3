@@ -75,10 +75,20 @@ const QuestionBankManager: React.FC<QuestionBankManagerProps> = ({
   const deleteFolder = (id: string, name: string) => {
       if (id === 'default') return showNotify("Không thể xóa thư mục hệ thống", "warning");
       if (window.confirm(`Xóa thư mục "${name}"? Toàn bộ câu hỏi bên trong sẽ bị xóa.`)) {
+          // Lấy danh sách ID câu hỏi thuộc folder bị xóa
+          const deletedQuestionIds = new Set(questions.filter(q => q.folderId === id).map(q => q.id));
+          
           setFolders(prev => prev.filter(f => f.id !== id));
           setQuestions(prev => prev.filter(q => q.folderId !== id));
+          
+          // Xóa exam nếu chứa câu hỏi thuộc folder bị xóa, hoặc lọc bỏ các questionId đã xóa
+          setExams(prev => prev.map(exam => ({
+            ...exam,
+            questionIds: exam.questionIds.filter(qId => !deletedQuestionIds.has(qId))
+          })).filter(exam => exam.questionIds.length > 0));
+          
           if (selectedFolderId === id) setSelectedFolderId('all');
-          showNotify("Đã dọn dẹp thư mục và câu hỏi liên quan.", "info");
+          showNotify("Đã dọn dẹp thư mục, câu hỏi và đề thi liên quan.", "info");
       }
   };
 

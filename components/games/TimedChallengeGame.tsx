@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Question, QuestionType } from '../../types';
 import { formatContent } from '../../utils/textFormatter';
 import SummaryReview from './shared/SummaryReview';
@@ -18,6 +18,10 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
   const [essayInput, setEssayInput] = useState('');
   const timerRef = useRef<any>(null);
 
+  // Ref để theo dõi timeLeft trong interval callback mà không gây side-effect trong setState
+  const timeLeftRef = useRef(timeLeft);
+  timeLeftRef.current = timeLeft;
+
   // Tích hợp hook giọng nói cho các câu tự luận nếu cần (hoặc nhập liệu văn bản)
   const { 
     isRecording, 
@@ -27,33 +31,18 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
     resetTranscript 
   } = useSpeechRecognition('vi-VN');
 
-  useEffect(() => {
-    if (gameState === 'PLAYING') {
-      startTimer();
+  // Clear timer helper — dùng chung để tránh timer chồng chất
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
-    return () => clearInterval(timerRef.current);
-  }, [currentIdx, gameState]);
+  }, []);
 
-  useEffect(() => {
-    if (transcript) setEssayInput(transcript);
-  }, [transcript]);
+  const handleAnswer = useCallback((val: any) => {
+    clearTimer(); // Clear timer NGAY khi trả lời để tránh race condition
 
-  const startTimer = () => {
-    clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          handleAnswer("Hết thời gian");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const handleAnswer = (val: any) => {
-    const nextAnswers = [...userAnswers, val];
-    setUserAnswers(nextAnswers);
+    setUserAnswers(prev => [...prev, val]);
     stopRecording();
     resetTranscript();
     
@@ -64,7 +53,51 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
     } else {
       setGameState('SUMMARY');
     }
-  };
+  }, [currentIdx, questions.length, clearTimer, stopRecording, resetTranscript]);
+
+  // Timer effect — không gọi side-effect bên trong setState updater nữa
+  useEffect(() => {
+    if (gameState !== 'PLAYING') return;
+
+    clearTimer();
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          // KHÔNG gọi handleAnswer bên trong setState updater
+          // Thay vào đó đặt flag để xử lý bên ngoài
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return clearTimer;
+  }, [currentIdx, gameState, clearTimer]);
+
+  // Effect riêng để xử lý hết giờ — tách side-effect ra khỏi setState
+  useEffect(() => {
+    if (timeLeft === 0 && gameState === 'PLAYING') {
+      handleAnswer("Hết thời gian");
+    }
+  }, [timeLeft, gameState, handleAnswer]);
+
+  useEffect(() => {
+    if (transcript) setEssayInput(transcript);
+  }, [transcript]);
+
+  // Guard: nếu không có câu hỏi thì hiển thị thông báo
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-full bg-slate-950 text-white flex flex-col items-center justify-center font-inter gap-8">
+        <i className="fas fa-exclamation-triangle text-6xl text-yellow-500"></i>
+        <h2 className="text-2xl font-black">Không có câu hỏi nào</h2>
+        <p className="text-slate-400">Vui lòng chọn chủ đề có câu hỏi ở Lobby.</p>
+        <button onClick={onExit} className="px-10 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase tracking-widest hover:bg-blue-500 hover:text-white transition-all">
+          Quay lại
+        </button>
+      </div>
+    );
+  }
 
   if (gameState === 'SUMMARY') {
     return (
@@ -96,7 +129,7 @@ const TimedChallengeGame: React.FC<TimedChallengeGameProps> = ({ questions, onEx
             {formatContent(currentQ.content)}
           </div>
           
-          {/* Hiển thị ảnh minh họa - Fix: use currentQ.image instead of imageUrl */}
+          {/* Hiển thị ảnh minh họa */}
           {currentQ.image && (
             <div className="mt-8 flex justify-center">
                 <img 
