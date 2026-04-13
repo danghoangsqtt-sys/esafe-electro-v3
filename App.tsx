@@ -10,6 +10,8 @@ import Settings from './components/Settings';
 import QuestionBankManager from './components/QuestionBankManager';
 import ChangelogModal from './components/ChangelogModal';
 import NewsSection from './components/NewsSection';
+import ClassStudentManager from './components/ClassStudentManager';
+import TeacherManagerLocal from './components/TeacherManagerLocal';
 import { Question, VectorChunk, QuestionFolder, Exam } from './types';
 import pkg from './package.json';
 
@@ -66,13 +68,13 @@ const Dashboard: React.FC<DashboardProps> = ({ questions, folders, exams, docCou
                 <div className="space-y-4 relative z-10">
                   <div className="flex items-center gap-3 text-blue-600 font-black text-[11px] uppercase tracking-[0.3em]">
                     <i className="fas fa-graduation-cap animate-bounce"></i>
-                    Nền tảng Quản lý Học tập & Thi cử Toàn diện
+                    Khoa Cơ Sở — Nền tảng Dạy học Thông minh
                   </div>
-                  <h1 className="text-6xl font-black text-slate-900 tracking-tighter leading-none">
-                    LMS Core <br/> <span className="text-blue-600">Learning Center</span>
+                  <h1 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter leading-tight">
+                    Hệ thống hỗ trợ dạy học <br/> <span className="text-blue-600">các môn học của Khoa cơ sở</span>
                   </h1>
                   <p className="text-slate-500 text-xl font-medium max-w-xl">
-                    Hệ thống thông minh hỗ trợ quản lý học liệu, ngân hàng câu hỏi và tổ chức kiểm tra đa môn học.
+                    Hệ thống thông minh hỗ trợ quản lý học liệu, ngân hàng câu hỏi, tổ chức đào tạo và kiểm tra đa môn học.
                   </p>
                 </div>
                 <div className="flex flex-col gap-4 relative z-10">
@@ -213,7 +215,7 @@ const App: React.FC = () => {
                 <i className="fas fa-graduation-cap"></i>
               </div>
               <div className="flex flex-col">
-                <span className="text-2xl font-black tracking-tighter leading-none text-slate-900">LMS Core</span>
+                <span className="text-lg font-black tracking-tighter leading-none text-slate-900">Khoa Cơ Sở</span>
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Version {pkg.version}</span>
               </div>
             </div>
@@ -224,6 +226,10 @@ const App: React.FC = () => {
             <SidebarLink to="/" icon="fa-house" label="Tổng quan" />
             <SidebarLink to="/documents" icon="fa-book-open" label="Giáo trình PDF" />
             <SidebarLink to="/bank" icon="fa-database" label="Ngân hàng đề" />
+            
+            <div className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] px-4 mt-10 mb-4">Quản lý Đào tạo</div>
+            <SidebarLink to="/classes" icon="fa-school" label="Lớp học & Học viên" />
+            <SidebarLink to="/teachers" icon="fa-chalkboard-user" label="Giảng viên" />
             
             <div className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] px-4 mt-10 mb-4">Thông minh</div>
             <SidebarLink to="/generate" icon="fa-wand-magic-sparkles" label="AI Biên soạn" />
@@ -236,7 +242,7 @@ const App: React.FC = () => {
 
           <div className="p-10 border-t border-slate-50">
              <div className="bg-slate-50 p-4 rounded-2xl text-[9px] font-black text-slate-400 text-center uppercase tracking-[0.3em]">
-                Standard LMS Environment
+                Khoa Cơ Sở — LMS Platform
              </div>
           </div>
         </aside>
@@ -253,6 +259,8 @@ const App: React.FC = () => {
                       <Route path="/documents" element={<Documents onUpdateKnowledgeBase={updateKnowledgeBase} onDeleteDocumentData={deleteKnowledgeByDocId} onNotify={showNotify} />} />
                       <Route path="/generate" element={<QuestionGenerator folders={folders} onSaveQuestions={(q)=>setQuestions(p=>[...p,...q])} onNotify={showNotify}/>} />
                       <Route path="/bank" element={<QuestionBankManager questions={questions} setQuestions={setQuestions} folders={folders} setFolders={setFolders} exams={exams} setExams={setExams} showNotify={showNotify} />} />
+                      <Route path="/classes" element={<ClassStudentManager onNotify={showNotify} />} />
+                      <Route path="/teachers" element={<TeacherManagerLocal onNotify={showNotify} />} />
                       <Route path="/game" element={<GameQuiz questions={questions} folders={folders} />} />
                       <Route path="/guide" element={<UserGuide />} />
                       <Route path="/settings" element={<Settings onNotify={showNotify} />} />

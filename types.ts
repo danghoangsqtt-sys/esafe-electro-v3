@@ -99,6 +99,42 @@ export interface NewsArticle {
   source: string;
 }
 
+// ===== Quản lý Lớp học, Học viên, Giảng viên =====
+
+export interface ClassInfo {
+  id: string;
+  name: string;
+  teacherId: string;
+  teacherName: string;
+  studentCount: number;
+  isActive: boolean;
+  createdAt: number;
+}
+
+export interface StudentInfo {
+  id: string;
+  fullName: string;
+  email: string;
+  classId: string;
+  className: string;
+  gender: string;
+  phone: string;
+  status: 'active' | 'pending' | 'inactive';
+  enrolledAt: number;
+}
+
+export interface TeacherInfo {
+  id: string;
+  fullName: string;
+  email: string;
+  department: string;
+  specialization: string;
+  phone: string;
+  classIds: string[];
+  status: 'active' | 'inactive';
+  createdAt: number;
+}
+
 /**
  * Augmenting Global Scope for Electron integration
  */

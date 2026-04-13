@@ -272,11 +272,47 @@ const Settings: React.FC<SettingsProps> = ({ onNotify }) => {
              <h3 className="font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
                 <i className="fas fa-cloud-arrow-down text-blue-600"></i> Cập nhật & Sao lưu
              </h3>
+
+             {/* UPDATE RESULT */}
+             {updateInfo && (
+               <div className={`p-6 rounded-2xl border ${updateInfo.isUpdateAvailable ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+                 <div className="flex items-center gap-3 mb-3">
+                   <i className={`fas ${updateInfo.isUpdateAvailable ? 'fa-arrow-circle-up text-blue-600' : 'fa-check-circle text-green-600'} text-xl`}></i>
+                   <h4 className="font-black text-sm uppercase tracking-tight text-slate-800">
+                     {updateInfo.isUpdateAvailable ? 'Có phiên bản mới!' : 'Đã cập nhật mới nhất'}
+                   </h4>
+                 </div>
+                 <div className="grid grid-cols-2 gap-3 mb-3">
+                   <div className="bg-white p-3 rounded-xl border border-slate-100">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Phiên bản hiện tại</p>
+                     <p className="text-lg font-black text-slate-800">v{updateInfo.currentVersion}</p>
+                   </div>
+                   <div className="bg-white p-3 rounded-xl border border-slate-100">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Phiên bản mới nhất</p>
+                     <p className={`text-lg font-black ${updateInfo.isUpdateAvailable ? 'text-blue-600' : 'text-green-600'}`}>v{updateInfo.latestVersion}</p>
+                   </div>
+                 </div>
+                 {updateInfo.changelog && (
+                   <p className="text-xs text-slate-600 font-medium bg-white p-3 rounded-xl border border-slate-100 italic mb-3">{updateInfo.changelog}</p>
+                 )}
+                 {updateInfo.isUpdateAvailable && updateInfo.updateUrl && (
+                   <a
+                     href={updateInfo.updateUrl}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                   >
+                     <i className="fas fa-download"></i> Tải bản cập nhật
+                   </a>
+                 )}
+               </div>
+             )}
+
              <div className="space-y-3">
                 <button onClick={handleCheckUpdate} disabled={isChecking} className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-2xl hover:bg-blue-50 transition-all group">
                     <div className="flex items-center gap-3">
-                        <i className="fas fa-search text-slate-400 group-hover:text-blue-600"></i>
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-600">Kiểm tra bản mới</span>
+                        <i className={`fas ${isChecking ? 'fa-circle-notch fa-spin' : 'fa-search'} text-slate-400 group-hover:text-blue-600`}></i>
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-600">{isChecking ? 'Đang kiểm tra...' : 'Kiểm tra bản mới'}</span>
                     </div>
                     {isChecking && <i className="fas fa-circle-notch fa-spin text-blue-600"></i>}
                 </button>
